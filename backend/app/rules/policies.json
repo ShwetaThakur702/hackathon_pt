@@ -1,0 +1,16 @@
+{
+  "policy_id": "UPI_FAILED_TRANSACTION_V1",
+  "version": "1.0",
+  "transaction_rules": {
+    "PERSON": {
+      "deadline_days": 1,
+      "compensation_per_day": 100
+    },
+    "MERCHANT": {
+      "deadline_days": 5,
+      "compensation_per_day": 100
+    }
+  },
+  "high_value_threshold": 50000,
+  "ombudsman_threshold_days": 30
+}

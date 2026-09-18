@@ -1,0 +1,34 @@
+import Link from "next/link";
+import { AutoPayIcon, BillsIcon, FastagIcon, PaymentsIcon, RefundsIcon } from "@/components/shell/icons";
+
+const SERVICES = [
+  { label: "UPI", href: "/payments", icon: PaymentsIcon },
+  { label: "Bills", href: "/bills", icon: BillsIcon },
+  { label: "FASTag", href: "/fastag", icon: FastagIcon },
+  { label: "AutoPay", href: "/autopay", icon: AutoPayIcon },
+  { label: "Refunds", href: "/refunds", icon: RefundsIcon },
+  { label: "Travel", href: "/travel", icon: PaymentsIcon },
+];
+
+export default function QuickServices() {
+  return (
+    <div className="card p-5">
+      <h2 className="text-sm font-semibold text-ink mb-4">Quick services</h2>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+        {SERVICES.map((s) => {
+          const Icon = s.icon;
+          return (
+            <Link
+              key={s.label}
+              href={s.href}
+              className="tap-target flex flex-col items-center gap-2 rounded-xl border border-border py-4 text-xs text-ink hover:border-brand hover:bg-brand-light/40 transition-colors"
+            >
+              <Icon className="w-5 h-5 text-brand-dark" />
+              {s.label}
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

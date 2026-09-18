@@ -1,0 +1,113 @@
+{
+  "name": "Nishchint - Failed Payment Follow-up",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nishchint-followup-scheduled",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "1a1b1c1d-0001-4a4a-9a9a-000000000001",
+      "name": "Webhook: Follow-up Scheduled",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-100, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{$json.body.followup_id}}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            },
+            {
+              "leftValue": "={{$json.body.case_id}}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1a1b1c1d-0002-4a4a-9a9a-000000000002",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [120, 300]
+    },
+    {
+      "parameters": {
+        "resume": "specificTime",
+        "dateTime": "={{$json.body.scheduled_for}}"
+      },
+      "id": "1a1b1c1d-0003-4a4a-9a9a-000000000003",
+      "name": "Wait Until Deadline",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "webhookId": "nishchint-followup-wait",
+      "position": [340, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_BASE_URL}}/api/workflows/execute-followup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ followup_id: $('Webhook: Follow-up Scheduled').item.json.body.followup_id }) }}",
+        "options": {}
+      },
+      "id": "1a1b1c1d-0004-4a4a-9a9a-000000000004",
+      "name": "Execute Follow-up (Recheck + Decide + Act)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [560, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_BASE_URL}}/api/workflows/followup-result",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ case_id: $json.case_id, workflow_id: $execution.id, result: $json.result, dispute_id: $json.dispute_id || null, secret: $env.N8N_CALLBACK_SECRET }) }}",
+        "options": {}
+      },
+      "id": "1a1b1c1d-0005-4a4a-9a9a-000000000005",
+      "name": "Report Result to Backend (audit callback)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 220]
+    },
+    {
+      "parameters": {},
+      "id": "1a1b1c1d-0006-4a4a-9a9a-000000000006",
+      "name": "Invalid Payload - No-op",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [340, 420]
+    }
+  ],
+  "connections": {
+    "Webhook: Follow-up Scheduled": {
+      "main": [[{ "node": "Validate Payload", "type": "main", "index": 0 }]]
+    },
+    "Validate Payload": {
+      "main": [
+        [{ "node": "Wait Until Deadline", "type": "main", "index": 0 }],
+        [{ "node": "Invalid Payload - No-op", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait Until Deadline": {
+      "main": [[{ "node": "Execute Follow-up (Recheck + Decide + Act)", "type": "main", "index": 0 }]]
+    },
+    "Execute Follow-up (Recheck + Decide + Act)": {
+      "main": [[{ "node": "Report Result to Backend (audit callback)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "nishchint-prototype" }
+}

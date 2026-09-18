@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #f5f7fa;
+  color: #1f2937;
+}
+
+.card {
+  @apply bg-white rounded-xl border border-border shadow-card;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+}
+
+.amount {
+  @apply font-semibold tabular-nums text-ink;
+}
+
+.page-shell {
+  @apply max-w-6xl mx-auto px-4 sm:px-6 py-6;
+}
+
+.tap-target {
+  @apply min-h-[44px] min-w-[44px];
+}
+
+/* Bottom nav needs the content area to clear it on mobile. */
+.pb-bottom-nav {
+  padding-bottom: 76px;
+}
+
+@media (min-width: 1024px) {
+  .pb-bottom-nav {
+    padding-bottom: 0;
+  }
+}
