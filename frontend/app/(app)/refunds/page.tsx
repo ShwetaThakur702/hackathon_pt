@@ -5,8 +5,9 @@ import { getRefunds, investigateRefund } from "@/lib/api";
 import { useAssistant } from "@/lib/assistant-context";
 import { useCustomer } from "@/lib/customer-context";
 import type { Refund } from "@/types";
+import CaseTracker from "@/components/CaseTracker";
 
-function RefundCard({ refund, onInvestigated }: { refund: Refund; onInvestigated: (refund: Refund) => void }) {
+function RefundCard({ refund, onInvestigated, onRefresh }: { refund: Refund; onInvestigated: (refund: Refund) => void; onRefresh: () => void }) {
   const [investigating, setInvestigating] = useState(false);
   const [caseId, setCaseId] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -45,11 +46,16 @@ function RefundCard({ refund, onInvestigated }: { refund: Refund; onInvestigated
         </div>
       </div>
 
-      {refund.nishchint_insight.has_issue && (
+      {(refund.nishchint_insight.has_issue || caseId) && (
         <div className="mt-4 rounded-lg bg-brand-light px-3 py-3">
-          <p className="text-xs text-brand-dark">{refund.nishchint_insight.message}</p>
+          {refund.nishchint_insight.has_issue && <p className="text-xs text-brand-dark">{refund.nishchint_insight.message}</p>}
           {caseId ? (
-            <p className="text-xs text-success mt-2 font-medium animate-fade-in-up">✓ Case {caseId} created — I&apos;m monitoring this.</p>
+            <CaseTracker
+              caseId={caseId}
+              resolved={!refund.nishchint_insight.has_issue}
+              resolvedText={`Your ₹${refund.amount.toLocaleString("en-IN")} refund from ${refund.merchant_name} has reached your account.`}
+              onChanged={onRefresh}
+            />
           ) : (
             <button onClick={handleInvestigate} disabled={investigating} className="btn-primary btn-sm mt-2">
               {investigating ? "Investigating…" : "Investigate Refund"}
@@ -71,6 +77,10 @@ export default function RefundsPage() {
   function load() {
     setLoading(true);
     getRefunds(customerId).then(setRefunds).catch(console.error).finally(() => setLoading(false));
+  }
+
+  function refresh() {
+    getRefunds(customerId).then(setRefunds).catch(console.error);
   }
 
   useEffect(load, [customerId]);
@@ -105,6 +115,7 @@ export default function RefundsPage() {
             <RefundCard
               key={r.id}
               refund={r}
+              onRefresh={refresh}
               onInvestigated={(updated) => setRefunds((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
             />
           ))}

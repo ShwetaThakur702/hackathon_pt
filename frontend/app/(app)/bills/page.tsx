@@ -6,13 +6,14 @@ import { getBills, investigateBill } from "@/lib/api";
 import { useAssistant } from "@/lib/assistant-context";
 import { useCustomer } from "@/lib/customer-context";
 import type { Bill } from "@/types";
+import CaseTracker from "@/components/CaseTracker";
 
 const CATEGORY_LABEL: Record<string, string> = {
   ELECTRICITY: "Electricity", WATER: "Water", GAS: "Gas", MOBILE: "Mobile",
   DTH: "DTH", BROADBAND: "Broadband", INSURANCE: "Insurance", LOAN: "Loan / EMI", OTHER: "Other",
 };
 
-function BillCard({ bill, highlighted, onInvestigated }: { bill: Bill; highlighted: boolean; onInvestigated: (bill: Bill) => void }) {
+function BillCard({ bill, highlighted, onInvestigated, onRefresh }: { bill: Bill; highlighted: boolean; onInvestigated: (bill: Bill) => void; onRefresh: () => void }) {
   const [investigating, setInvestigating] = useState(false);
   const [caseId, setCaseId] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -49,11 +50,16 @@ function BillCard({ bill, highlighted, onInvestigated }: { bill: Bill; highlight
         </div>
       </div>
 
-      {bill.nishchint_insight.has_issue && (
+      {(bill.nishchint_insight.has_issue || caseId) && (
         <div className="mt-4 rounded-lg bg-brand-light px-3 py-3">
-          <p className="text-xs text-brand-dark">{bill.nishchint_insight.message}</p>
+          {bill.nishchint_insight.has_issue && <p className="text-xs text-brand-dark">{bill.nishchint_insight.message}</p>}
           {caseId ? (
-            <p className="text-xs text-success mt-2 font-medium animate-fade-in-up">✓ Case {caseId} created — I&apos;m monitoring this.</p>
+            <CaseTracker
+              caseId={caseId}
+              resolved={!bill.nishchint_insight.has_issue}
+              resolvedText={`${bill.provider_name} has acknowledged your payment.`}
+              onChanged={onRefresh}
+            />
           ) : (
             <button onClick={handleInvestigate} disabled={investigating} className="btn-primary btn-sm mt-2">
               {investigating ? "Investigating…" : "Investigate"}
@@ -85,6 +91,10 @@ function BillsPageInner() {
   function load() {
     setLoading(true);
     getBills(customerId).then(setBills).catch(console.error).finally(() => setLoading(false));
+  }
+
+  function refresh() {
+    getBills(customerId).then(setBills).catch(console.error);
   }
 
   useEffect(load, [customerId]);
@@ -124,6 +134,7 @@ function BillsPageInner() {
               key={b.id}
               bill={b}
               highlighted={b.id === highlight}
+              onRefresh={refresh}
               onInvestigated={(updated) => setBills((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
             />
           ))}

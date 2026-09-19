@@ -6,6 +6,7 @@ import { useAssistant } from "@/lib/assistant-context";
 import { useCustomer } from "@/lib/customer-context";
 import type { FastagAccount } from "@/types";
 import { FastagIcon } from "@/components/shell/icons";
+import CaseTracker from "@/components/CaseTracker";
 
 export default function FastagPage() {
   const { customerId } = useCustomer();
@@ -22,6 +23,10 @@ export default function FastagPage() {
       .then(setAccount)
       .catch(() => setAccount(null))
       .finally(() => setLoading(false));
+  }
+
+  function refresh() {
+    getFastagAccount(customerId).then(setAccount).catch(() => {});
   }
 
   useEffect(load, [customerId]);
@@ -85,11 +90,16 @@ export default function FastagPage() {
             </div>
           )}
 
-          {account.nishchint_insight.has_issue && (
+          {(account.nishchint_insight.has_issue || caseId) && (
             <div className="mt-4 rounded-lg bg-brand-light px-4 py-3">
-              <p className="text-sm text-brand-dark">{account.nishchint_insight.message}</p>
+              {account.nishchint_insight.has_issue && <p className="text-sm text-brand-dark">{account.nishchint_insight.message}</p>}
               {caseId ? (
-                <p className="text-xs text-success mt-2 font-medium animate-fade-in-up">✓ Case {caseId} created — I&apos;m monitoring this.</p>
+                <CaseTracker
+                  caseId={caseId}
+                  resolved={!account.nishchint_insight.has_issue}
+                  resolvedText={`Your FASTag balance has updated to ₹${account.balance.toLocaleString("en-IN")}.`}
+                  onChanged={refresh}
+                />
               ) : (
                 <button onClick={handleInvestigate} disabled={investigating} className="btn-primary btn-sm mt-2">
                   {investigating ? "Resolving…" : "Resolve"}
