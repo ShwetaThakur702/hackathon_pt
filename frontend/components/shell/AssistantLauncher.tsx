@@ -24,7 +24,7 @@ export default function AssistantLauncher() {
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Fresh conversation whenever the demo customer changes.
@@ -33,7 +33,11 @@ export default function AssistantLauncher() {
   }, [customerId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Scroll only this panel's own message list — not scrollIntoView(),
+    // which walks every scrollable ancestor including the page itself and
+    // was yanking the whole page down on every send.
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages, open]);
 
   async function send(text: string) {
@@ -108,7 +112,7 @@ export default function AssistantLauncher() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
               {messages.length === 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
@@ -172,7 +176,6 @@ export default function AssistantLauncher() {
                   </span>
                 </motion.div>
               )}
-              <div ref={bottomRef} />
             </div>
 
             <div className="border-t border-border p-3 flex gap-2 shrink-0">

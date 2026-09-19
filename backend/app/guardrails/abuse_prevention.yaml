@@ -1,0 +1,41 @@
+# Abuse prevention — NONE of these are implemented in this prototype.
+# Kept as an explicit next-hardening-step checklist rather than silently
+# absent. See app/guardrails/README.md for how `status` works.
+
+rules:
+  - id: per_customer_rate_limiting
+    status: REFERENCE_ONLY
+    description: >
+      /chat has no rate limit — a single customer_id can fire unlimited
+      requests, each potentially triggering an LLM call and a Cognee
+      round trip. A production deployment needs per-customer and/or
+      per-IP throttling in front of this endpoint.
+    would_apply_to: app.api.chat.chat
+
+  - id: message_length_cap
+    status: REFERENCE_ONLY
+    description: >
+      No maximum length is enforced on the incoming customer message
+      before it's forwarded to the LLM, which affects both cost and
+      worst-case latency.
+    would_apply_to: app.schemas.chat.ChatRequest
+
+  - id: repeated_ticket_creation_throttling
+    status: REFERENCE_ONLY
+    description: >
+      Nothing prevents a customer from generating many cases in rapid
+      succession for the same transaction if the matching logic in
+      find_relevant_transaction ever mismatches — case reuse
+      (get_open_case_for_transaction) covers the common case but isn't a
+      hard rate limit.
+    would_apply_to: app.agent.nodes.execute_action
+
+  - id: workflow_callback_replay_protection
+    status: REFERENCE_ONLY
+    description: >
+      /api/workflows/followup-result and /api/workflows/notify-customer
+      are protected by a shared bearer secret (N8N_CALLBACK_SECRET), but
+      there's no nonce/timestamp check — a captured valid request could in
+      principle be replayed. Low risk for a demo (n8n Cloud is the only
+      caller), worth hardening before any real customer-facing deployment.
+    would_apply_to: app.api.workflows

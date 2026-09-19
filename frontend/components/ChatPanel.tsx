@@ -30,7 +30,7 @@ export default function ChatPanel() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [caseDetail, setCaseDetail] = useState<CaseDetail | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setCaseId(null);
@@ -39,7 +39,11 @@ export default function ChatPanel() {
   }, [customerId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Scroll only this panel's own message list — not scrollIntoView(),
+    // which walks every scrollable ancestor including the page itself and
+    // was yanking the whole page down on every send.
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   async function refreshCase(id: string) {
@@ -83,7 +87,7 @@ export default function ChatPanel() {
           <span className="badge bg-surface text-ink-secondary">{customer.name}</span>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && (
             <div className="text-sm text-ink-secondary italic">Hi {customer.name.split(" ")[0]}. How can I help?</div>
           )}
@@ -127,7 +131,6 @@ export default function ChatPanel() {
               </span>
             </div>
           )}
-          <div ref={bottomRef} />
         </div>
 
         <div className="border-t border-border p-3 flex gap-2">

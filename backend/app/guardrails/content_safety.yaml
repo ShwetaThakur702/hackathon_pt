@@ -1,0 +1,38 @@
+# Content safety — secrets and sensitive customer input.
+# See app/guardrails/README.md for how `status` works.
+
+rules:
+  - id: sensitive_credential_detection
+    status: ACTIVE
+    description: >
+      Detects UPI PIN, OTP, card PIN, or password shared in a customer
+      message before it reaches the LLM or is stored anywhere.
+    pattern: '\b(otp|pin|upi\s*pin|card\s*pin|password)\b.{0,15}?(\d{3,6})'
+    enforced_by: app.integrations.llm.llm_service.contains_sensitive_credential
+    on_match:
+      - do_not_forward_to_llm: true
+      - do_not_persist_raw_value: true
+      - route_to: generate_response (short-circuit, skips retrieve_context/
+          identify_transaction/policy evaluation entirely)
+      - respond_with: a canned security warning in the customer's language
+          (SECURITY_WARNING_EN / _HI / _HINGLISH in app/agent/nodes.py)
+      - audit_event: SENSITIVE_CREDENTIAL_DETECTED (event only, never the
+          matched value — app/agent/tools.write_audit_event)
+
+  - id: secret_never_in_audit_metadata
+    status: ACTIVE
+    description: >
+      Even the audit trail entry for a detected credential never contains
+      the raw secret digits — only that detection occurred.
+    enforced_by: app.agent.nodes.understand_complaint
+    verified_by: backend/tests/test_safety.py::test_chat_warns_and_does_not_store_secret
+
+  - id: pii_redaction_in_logs
+    status: REFERENCE_ONLY
+    description: >
+      Structured application logs (not audit events) can still contain raw
+      customer message text today. A production deployment should redact
+      PII (phone numbers, amounts tied to identity) before any log line
+      leaves the process, independent of the sensitive-credential check
+      above, which only covers OTP/PIN/password patterns.
+    would_apply_to: logging calls across app/api and app/agent

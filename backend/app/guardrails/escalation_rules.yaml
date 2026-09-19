@@ -1,0 +1,54 @@
+# Escalation rules — when a human takes over instead of the agent.
+# See app/guardrails/README.md for how `status` works.
+
+rules:
+  - id: high_value_transaction_escalation
+    status: ACTIVE
+    description: >
+      Any transaction at or above the high-value threshold is always
+      escalated to a human, regardless of what the policy engine would
+      otherwise recommend. The agent never autonomously raises a dispute
+      or promises compensation on a high-value transaction.
+    threshold: 50000 INR (Settings.high_value_threshold, app/config.py —
+      overridable via HIGH_VALUE_THRESHOLD env var)
+    enforced_by: app.rules.engine.PolicyEngine.is_high_value, checked in
+      app.agent.nodes.decide_next_action before any FOLLOW_UP/RAISE_DISPUTE
+      decision is made
+
+  - id: suspicious_language_escalation
+    status: ACTIVE
+    description: >
+      Messages containing fraud/unauthorized-access language are escalated
+      to a human rather than processed as a routine failed-payment
+      complaint — these need human judgment, not automated dispute logic.
+    keywords: ["hack", "fraud", "unauthorized", "not me", "maine nahi kiya", "chori"]
+    enforced_by: app.agent.nodes.SUSPICIOUS_KEYWORDS,
+      app.agent.nodes.decide_next_action
+
+  - id: ambiguous_transaction_escalation
+    status: ACTIVE
+    description: >
+      If the customer's message can't be matched to exactly one
+      transaction (none found, or multiple candidates), the agent asks a
+      clarifying question instead of guessing which transaction to act on.
+    enforced_by: app.agent.nodes.decide_next_action (NEEDS_CLARIFICATION
+      branch), app.agent.tools.find_relevant_transaction
+
+  - id: ombudsman_eligibility_surfaced_not_auto_filed
+    status: ACTIVE
+    description: >
+      Once a case has been open past the ombudsman-eligibility window, that
+      fact is surfaced (case/policy_result), but the agent never files an
+      ombudsman complaint on the customer's behalf — that step stays
+      human-initiated.
+    enforced_by: app.rules.engine.PolicyEngine.is_ombudsman_eligible
+
+  - id: repeated_failed_resolution_escalation
+    status: REFERENCE_ONLY
+    description: >
+      A case that has cycled through multiple follow-up attempts without
+      resolving (e.g. 3+ STILL_PENDING outcomes) should escalate to a
+      human rather than keep rescheduling indefinitely. Today
+      FollowupService reschedules on every non-terminal outcome with no
+      attempt cap.
+    would_apply_to: app.services.followup_service.FollowupService.execute_due_followup

@@ -1,0 +1,52 @@
+# Scope boundaries — what Nishchint will and won't engage with.
+# See app/guardrails/README.md for how `status` works.
+
+rules:
+  - id: business_scope_only
+    status: ACTIVE
+    description: >
+      Nishchint only handles Paytm payments, bills, refunds, and account/
+      service support. Anything else (general chit-chat, trivia, requests
+      unrelated to a payments support assistant's job) is classified
+      OFF_TOPIC by the LLM's own intent classification and gets a short
+      redirect — no second LLM call, no case created, no DB context pulled.
+    enforced_by: app.agent.prompts.UNDERSTAND_SYSTEM_PROMPT (classifier
+      instruction) + app.agent.nodes.generate_response (OFF_TOPIC branch)
+    example_response: >
+      "I can only help with Paytm payments, bills, and account support.
+      What can I help you with on that front?"
+
+  - id: greeting_fast_path
+    status: ACTIVE
+    description: >
+      A bare greeting ("hi", "hello", "namaste", ...) gets an instant
+      canned reply with zero LLM/DB calls, instead of falling into
+      NEEDS_CLARIFICATION and nonsensically asking a greeting for a
+      transaction ID.
+    enforced_by: app.integrations.llm.llm_service.is_greeting
+    note: >
+      Deliberately regex-anchored to the WHOLE message — "hi, my payment
+      failed" is NOT treated as a bare greeting and still goes through
+      full understanding.
+
+  - id: no_financial_advice_outside_own_transactions
+    status: REFERENCE_ONLY
+    description: >
+      Nishchint should refuse general financial/investment advice (e.g.
+      "should I invest in X") even though it may superficially look
+      payments-adjacent. Today this collapses into the generic OFF_TOPIC
+      path, which is roughly correct but isn't a distinct, deliberately
+      tested category.
+    would_apply_to: app.agent.prompts.UNDERSTAND_SYSTEM_PROMPT
+
+  - id: language_consistency
+    status: ACTIVE
+    description: >
+      The customer's response language is picked once (account setting),
+      never re-guessed per message. Every reply — chat, floating assistant,
+      follow-up notifications, security warnings, greetings — must use
+      that exact language, regardless of what language the customer typed
+      in.
+    enforced_by: app.integrations.llm.llm_service.normalize_language,
+      threaded through app.agent.state.NishchintState.preferred_language
+      for the fast-path replies that skip retrieve_context

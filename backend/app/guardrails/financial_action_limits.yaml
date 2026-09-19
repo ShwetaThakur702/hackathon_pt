@@ -1,0 +1,58 @@
+# Financial action limits — what the agent may compute/claim vs. must
+# never invent. This is the core architectural rule the whole agent is
+# built around. See app/guardrails/README.md for how `status` works.
+
+rules:
+  - id: llm_never_computes_financial_facts
+    status: ACTIVE
+    description: >
+      The LLM is used for exactly two things — understanding a customer's
+      message (intent/entity extraction) and phrasing a reply. It never
+      decides a transaction status, refund status, deadline, or
+      compensation amount. Every financial figure a customer sees is
+      computed by PolicyEngine (deterministic, config-driven) or read
+      directly from the database, then handed to the LLM as
+      already-verified facts it may only restate, never alter.
+    enforced_by: app.rules.engine.PolicyEngine.evaluate (all deadline/
+      compensation math), app.agent.prompts.RESPONSE_SYSTEM_PROMPT
+      ("must NOT invent, alter, or add any financial figure, date, or
+      status that is not present in the verified facts")
+
+  - id: compensation_formula_is_fixed_config
+    status: ACTIVE
+    description: >
+      Compensation for a breached refund deadline is
+      days_overdue * compensation_per_day, both sourced from
+      app/rules/policies.json — never computed or estimated by the LLM,
+      never a round number chosen "to sound reasonable".
+    enforced_by: app.rules.engine.PolicyEngine.evaluate
+
+  - id: semantic_memory_never_overrides_verified_facts
+    status: ACTIVE
+    description: >
+      Cognee's semantic/historical memory is passed to the response LLM
+      call as background color only, explicitly labeled "context only, NOT
+      authoritative" in the prompt — it can never be mistaken for a
+      current financial fact to restate.
+    enforced_by: app.integrations.llm.llm_service.LLMService.generate_response
+      (semantic_context handling)
+
+  - id: no_autonomous_fund_movement
+    status: ACTIVE
+    description: >
+      The agent raises disputes and schedules follow-ups; it never itself
+      moves money. Compensation figures are computed and communicated, not
+      disbursed by this codebase — that stays a downstream/manual step
+      outside the agent's authority.
+    enforced_by: app.agent.nodes.execute_action (RAISE_DISPUTE branch calls
+      tools.raise_dispute, never a payment/transfer call)
+
+  - id: dispute_amount_cap
+    status: REFERENCE_ONLY
+    description: >
+      There is no upper cap on accumulated per-day compensation for a
+      long-overdue case — days_overdue * compensation_per_day grows
+      unbounded the longer a case sits unresolved. A production deployment
+      should cap this (or force human escalation past some accumulated
+      amount) rather than let it compound indefinitely.
+    would_apply_to: app.rules.engine.PolicyEngine.evaluate
