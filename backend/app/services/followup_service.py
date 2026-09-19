@@ -51,13 +51,25 @@ class FollowupService:
         db.refresh(followup)
 
         case = case_service.get_case(db, case_id)
+        transaction = transaction_service.get_transaction(db, case.transaction_id) if case and case.transaction_id else None
         webhook_result = n8n_client.trigger_followup_scheduled(
             {
+                # followup_id doubles as this event's idempotency key
+                # (event_id) — n8n's workflow uses it, unchanged, to call
+                # back into /execute-followup, which is itself idempotent
+                # per followup_id (see execute_due_followup below).
+                "event_id": followup.id,
+                "followup_id": followup.id,
                 "case_id": case_id,
                 "customer_id": case.customer_id if case else None,
+                "correlation_id": case_id,
                 "transaction_id": case.transaction_id if case else None,
-                "followup_id": followup.id,
+                # Customer-facing identifier — n8n/webhook consumers should
+                # never need the internal transaction id.
+                "upi_reference_id": transaction["upi_ref_no"] if transaction else None,
                 "scheduled_for": scheduled_for.isoformat(),
+                "next_check_at": scheduled_for.isoformat(),
+                "reason": action,
                 "action": action,
             }
         )
@@ -81,12 +93,52 @@ class FollowupService:
     def get_followup(self, db: Session, followup_id: str) -> Followup | None:
         return db.get(Followup, followup_id)
 
+    def _outcome_snapshot(self, db: Session, case) -> dict:
+        """Rebuilds the same {status, outcome, action_taken,
+        current_compensation, next_check_at} contract from CURRENT stored
+        state, without re-running any action. Used for an idempotent
+        replay of an already-completed follow-up (spec section 6: a
+        duplicate webhook/event must never re-raise a dispute, re-notify,
+        etc. — it just gets told what already happened)."""
+        active_followup = self.get_active_followup_for_case(db, case.id)
+        next_check_at = active_followup.scheduled_for.isoformat() if active_followup else None
+
+        if case.status == "RESOLVED":
+            return {
+                "customer_id": case.customer_id,
+                "status": "RESOLVED", "outcome": "RESOLVED", "action_taken": "close_case",
+                "current_compensation": None, "next_check_at": None,
+            }
+        if case.status == "DISPUTE_RAISED":
+            transaction = transaction_service.get_transaction(db, case.transaction_id) if case.transaction_id else None
+            compensation = None
+            if transaction:
+                compensation = policy_engine.evaluate(transaction, simulation_clock_service.now(db)).compensation
+            return {
+                "customer_id": case.customer_id,
+                "status": "UNRESOLVED", "outcome": "DISPUTE_RAISED", "action_taken": "raise_dispute",
+                "current_compensation": compensation, "next_check_at": next_check_at,
+            }
+        if case.status == "HUMAN_ESCALATED":
+            return {
+                "customer_id": case.customer_id,
+                "status": "ESCALATED", "outcome": "ESCALATED", "action_taken": "escalate_to_human",
+                "current_compensation": None, "next_check_at": None,
+            }
+        return {
+            "customer_id": case.customer_id,
+            "status": "MONITORING", "outcome": "CONTINUE_MONITORING", "action_taken": None,
+            "current_compensation": None, "next_check_at": next_check_at,
+        }
+
     def execute_due_followup(self, db: Session, followup_id: str) -> dict:
         followup = db.get(Followup, followup_id)
         if followup is None:
             return {"error": "followup_not_found"}
         if followup.status == "COMPLETED":
-            return {"already_completed": True, "followup_id": followup_id}
+            case = case_service.get_case(db, followup.case_id)
+            snapshot = self._outcome_snapshot(db, case) if case else {}
+            return {"already_completed": True, "followup_id": followup_id, "case_id": followup.case_id, **snapshot}
 
         followup.status = "RUNNING"
         followup.attempt_count += 1
@@ -134,7 +186,11 @@ class FollowupService:
                 notification_service.notify_customer(db, case.customer_id, case.id, message)
                 # Memory write point (spec section 8/39): follow-up result — resolved.
                 memory_service.remember_resolution(db, case.id, transaction, "RESOLVED")
-                result = {"result": "RESOLVED", "case_id": case.id}
+                result = {
+                    "result": "RESOLVED", "case_id": case.id, "customer_id": case.customer_id,
+                    "status": "RESOLVED", "outcome": "RESOLVED", "action_taken": "close_case",
+                    "current_compensation": None, "next_check_at": None, "notification_message": message,
+                }
 
             elif policy_result.is_breached:
                 dispute, created = dispute_service.raise_dispute(
@@ -164,8 +220,14 @@ class FollowupService:
                 # still RUNNING at this point.
                 followup.status = "COMPLETED"
                 db.commit()
-                self.schedule(db, case.id, now + timedelta(days=1))
-                result = {"result": "DISPUTE_RAISED", "case_id": case.id, "dispute_id": dispute.id}
+                next_check = now + timedelta(days=1)
+                self.schedule(db, case.id, next_check)
+                result = {
+                    "result": "DISPUTE_RAISED", "case_id": case.id, "customer_id": case.customer_id, "dispute_id": dispute.id,
+                    "status": "UNRESOLVED", "outcome": "DISPUTE_RAISED", "action_taken": "raise_dispute",
+                    "current_compensation": policy_result.compensation, "next_check_at": next_check.isoformat(),
+                    "notification_message": message,
+                }
 
             else:
                 # Not yet breached — keep waiting and schedule the next check
@@ -174,7 +236,12 @@ class FollowupService:
                 deadline_dt = datetime.fromisoformat(policy_result.deadline) if policy_result.deadline else now
                 self.schedule(db, case.id, deadline_dt)
                 memory_service.remember_resolution(db, case.id, transaction, "STILL_PENDING", policy_result.to_dict())
-                result = {"result": "STILL_PENDING", "case_id": case.id}
+                result = {
+                    "result": "STILL_PENDING", "case_id": case.id, "customer_id": case.customer_id,
+                    "status": "MONITORING", "outcome": "CONTINUE_MONITORING", "action_taken": None,
+                    "current_compensation": None, "next_check_at": deadline_dt.isoformat(),
+                    "notification_message": None,
+                }
 
             followup.status = "COMPLETED"
             db.commit()
@@ -191,7 +258,11 @@ class FollowupService:
                 case_service.transition(db, case.id, "HUMAN_ESCALATED", actor="SYSTEM", metadata={"reason": "followup_action_failed"})
             except Exception:
                 pass
-            return {"result": "FAILED", "case_id": case.id, "error": str(exc)}
+            return {
+                "result": "FAILED", "case_id": case.id, "customer_id": case.customer_id, "error": str(exc),
+                "status": "ESCALATED", "outcome": "ESCALATED", "action_taken": "escalate_to_human",
+                "current_compensation": None, "next_check_at": None, "notification_message": None,
+            }
 
 
 def _get_customer_language(db: Session, customer_id: str) -> str:

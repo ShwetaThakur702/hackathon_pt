@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getRefunds, investigateRefund } from "@/lib/api";
+import { useAssistant } from "@/lib/assistant-context";
 import { useCustomer } from "@/lib/customer-context";
 import type { Refund } from "@/types";
 
@@ -28,7 +29,7 @@ function RefundCard({ refund, onInvestigated }: { refund: Refund; onInvestigated
   }
 
   return (
-    <div className="card p-5">
+    <div className="stagger-item card card-hover p-5">
       <div className="flex items-start justify-between">
         <div>
           <div className="text-sm font-medium text-ink">{refund.merchant_name}</div>
@@ -48,13 +49,9 @@ function RefundCard({ refund, onInvestigated }: { refund: Refund; onInvestigated
         <div className="mt-4 rounded-lg bg-brand-light px-3 py-3">
           <p className="text-xs text-brand-dark">{refund.nishchint_insight.message}</p>
           {caseId ? (
-            <p className="text-xs text-success mt-2 font-medium">✓ Case {caseId} created — I&apos;m monitoring this.</p>
+            <p className="text-xs text-success mt-2 font-medium animate-fade-in-up">✓ Case {caseId} created — I&apos;m monitoring this.</p>
           ) : (
-            <button
-              onClick={handleInvestigate}
-              disabled={investigating}
-              className="mt-2 text-xs font-medium text-white bg-brand-dark rounded-lg px-3 py-1.5 hover:bg-brand-navy disabled:opacity-50"
-            >
+            <button onClick={handleInvestigate} disabled={investigating} className="btn-primary btn-sm mt-2">
               {investigating ? "Investigating…" : "Investigate Refund"}
             </button>
           )}
@@ -67,6 +64,7 @@ function RefundCard({ refund, onInvestigated }: { refund: Refund; onInvestigated
 
 export default function RefundsPage() {
   const { customerId } = useCustomer();
+  const { setPageContext } = useAssistant();
   const [refunds, setRefunds] = useState<Refund[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -77,6 +75,19 @@ export default function RefundsPage() {
 
   useEffect(load, [customerId]);
 
+  useEffect(() => {
+    const flagged = refunds.find((r) => r.nishchint_insight.has_issue);
+    if (!flagged) {
+      setPageContext(null);
+      return;
+    }
+    setPageContext({
+      summary: `your ₹${flagged.amount.toLocaleString("en-IN")} ${flagged.merchant_name} refund`,
+      suggestedMessage: "The merchant marked my refund complete, but the amount hasn't reached my account.",
+    });
+    return () => setPageContext(null);
+  }, [refunds, setPageContext]);
+
   return (
     <div className="page-shell space-y-5">
       <div>
@@ -85,11 +96,11 @@ export default function RefundsPage() {
       </div>
 
       {loading ? (
-        <div className="h-32 rounded-xl bg-surface animate-pulse" />
+        <div className="h-32 rounded-xl skeleton" />
       ) : refunds.length === 0 ? (
         <div className="card p-8 text-center text-sm text-ink-secondary">No refunds on file.</div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 stagger-list">
           {refunds.map((r) => (
             <RefundCard
               key={r.id}

@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useCustomer, DEMO_CUSTOMERS } from "@/lib/customer-context";
+import { useCustomer } from "@/lib/customer-context";
 import LanguageSelector from "@/components/home/LanguageSelector";
 import { BellIcon, SearchIcon, SparkleIcon, UserIcon } from "./icons";
 import SearchModal from "./SearchModal";
 
 export default function MobileTopBar() {
-  const { customerId, setCustomerId, customer } = useCustomer();
-  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const { customer } = useCustomer();
+  const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
   return (
@@ -36,39 +36,31 @@ export default function MobileTopBar() {
             <BellIcon className="w-5 h-5 text-ink-secondary" />
           </Link>
           <button
-            onClick={() => setSwitcherOpen(true)}
+            onClick={() => setProfileOpen(true)}
             className="tap-target flex items-center justify-center rounded-full bg-brand-light text-brand-dark"
-            aria-label={`Switch demo customer, currently ${customer.name}`}
+            aria-label={`${customer.name}'s profile`}
           >
             <UserIcon className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {switcherOpen && (
+      {profileOpen && (
         <div className="fixed inset-0 z-40 flex items-end" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setSwitcherOpen(false)} />
+          <div className="absolute inset-0 bg-black/30" onClick={() => setProfileOpen(false)} />
           <div className="relative w-full bg-white rounded-t-2xl p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
-            <h2 className="text-sm font-semibold text-ink mb-2">Reply language</h2>
+            <h2 className="text-sm font-semibold text-ink mb-1">{customer.name}</h2>
+            <p className="text-xs text-ink-secondary mb-4">Reply language</p>
             <div className="mb-4">
               <LanguageSelector variant="compact" />
             </div>
-            <h2 className="text-sm font-semibold text-ink mb-3">Demo customer</h2>
-            {DEMO_CUSTOMERS.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  setCustomerId(c.id);
-                  setSwitcherOpen(false);
-                }}
-                className={`w-full text-left px-3 py-3 rounded-lg text-sm mb-1 ${
-                  c.id === customerId ? "bg-brand-light text-brand-dark font-medium" : "hover:bg-surface text-ink"
-                }`}
-              >
-                {c.name}
-                <span className="block text-xs text-ink-secondary">{c.id}</span>
-              </button>
-            ))}
+            <Link
+              href="/profile"
+              onClick={() => setProfileOpen(false)}
+              className="block px-3 py-2.5 rounded-lg text-sm text-brand-dark hover:bg-surface border-t border-border pt-4"
+            >
+              View profile
+            </Link>
           </div>
         </div>
       )}

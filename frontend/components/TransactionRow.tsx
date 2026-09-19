@@ -5,7 +5,10 @@ import { displayStatus, STATUS_STYLES } from "@/lib/transaction-status";
 export default function TransactionRow({ txn }: { txn: Transaction }) {
   const status = displayStatus(txn);
   return (
-    <Link href={`/transactions/${txn.id}`} className="flex items-center justify-between px-5 py-3.5 hover:bg-surface">
+    <Link
+      href={`/transactions/${txn.id}`}
+      className="flex items-center justify-between px-5 py-3.5 transition-colors duration-150 hover:bg-surface active:bg-brand-light/40"
+    >
       <div className="min-w-0">
         <div className="text-sm font-medium text-ink truncate">{txn.merchant_name || "P2P transfer"}</div>
         <div className="text-xs text-ink-secondary">

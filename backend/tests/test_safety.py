@@ -17,7 +17,7 @@ def test_normal_message_is_not_flagged():
 
 
 def test_chat_warns_and_does_not_store_secret(client):
-    resp = client.post("/chat", json={"customer_id": "CUST001", "message": "My OTP is 998877", "case_id": None})
+    resp = client.post("/chat", json={"customer_id": "CUST-001", "message": "My OTP is 998877", "case_id": None})
     assert resp.status_code == 200
     body = resp.json()
     assert "OTP" in body["message"] or "otp" in body["message"].lower()

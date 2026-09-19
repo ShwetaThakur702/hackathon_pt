@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cancelMandate, getAutoPayMandates, reviewMandate } from "@/lib/api";
+import { useAssistant } from "@/lib/assistant-context";
 import { useCustomer } from "@/lib/customer-context";
 import type { AutoPayMandate } from "@/types";
 
@@ -40,7 +41,7 @@ function MandateCard({ mandate, onChanged }: { mandate: AutoPayMandate; onChange
   }
 
   return (
-    <div className="card p-5">
+    <div className="stagger-item card card-hover p-5">
       <div className="flex items-start justify-between">
         <div>
           <div className="text-sm font-medium text-ink">{mandate.biller_name}</div>
@@ -61,7 +62,7 @@ function MandateCard({ mandate, onChanged }: { mandate: AutoPayMandate; onChange
         <div className="mt-4 rounded-lg bg-warning-light px-3 py-3 space-y-2">
           <p className="text-xs text-ink">{mandate.nishchint_insight.message}</p>
           {reviewed && (
-            <div className="text-xs text-ink space-y-1">
+            <div className="text-xs text-ink space-y-1 animate-fade-in-up">
               <div>✓ Payment verified</div>
               <div>✓ AutoPay mandate found</div>
               <div>✓ Duplicate risk detected</div>
@@ -69,20 +70,12 @@ function MandateCard({ mandate, onChanged }: { mandate: AutoPayMandate; onChange
           )}
           <div className="flex gap-2 pt-1">
             {!reviewed && (
-              <button
-                onClick={handleReview}
-                disabled={busy}
-                className="text-xs font-medium text-brand-dark bg-white border border-brand-light rounded-lg px-3 py-1.5 hover:border-brand disabled:opacity-50"
-              >
+              <button onClick={handleReview} disabled={busy} className="btn-secondary btn-sm">
                 Review AutoPay
               </button>
             )}
             {reviewed && (
-              <button
-                onClick={handleCancel}
-                disabled={busy}
-                className="text-xs font-medium text-white bg-danger rounded-lg px-3 py-1.5 hover:opacity-90 disabled:opacity-50"
-              >
+              <button onClick={handleCancel} disabled={busy} className="btn-danger btn-sm">
                 {busy ? "Cancelling…" : "Cancel Upcoming AutoPay"}
               </button>
             )}
@@ -96,6 +89,7 @@ function MandateCard({ mandate, onChanged }: { mandate: AutoPayMandate; onChange
 
 export default function AutoPayPage() {
   const { customerId } = useCustomer();
+  const { setPageContext } = useAssistant();
   const [mandates, setMandates] = useState<AutoPayMandate[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -105,6 +99,18 @@ export default function AutoPayPage() {
   }
 
   useEffect(load, [customerId]);
+
+  useEffect(() => {
+    if (!mandates.some((m) => m.nishchint_insight.has_issue)) {
+      setPageContext(null);
+      return;
+    }
+    setPageContext({
+      summary: "your AutoPay mandate that looks like a duplicate-payment risk",
+      suggestedMessage: "You've already made this payment, but AutoPay is still scheduled — can you check on this?",
+    });
+    return () => setPageContext(null);
+  }, [mandates, setPageContext]);
 
   return (
     <div className="page-shell space-y-5">
@@ -116,13 +122,13 @@ export default function AutoPayPage() {
       {loading ? (
         <div className="space-y-3">
           {[0, 1].map((i) => (
-            <div key={i} className="h-28 rounded-xl bg-surface animate-pulse" />
+            <div key={i} className="h-28 rounded-xl skeleton" />
           ))}
         </div>
       ) : mandates.length === 0 ? (
         <div className="card p-8 text-center text-sm text-ink-secondary">No AutoPay mandates set up.</div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 stagger-list">
           {mandates.map((m) => (
             <MandateCard
               key={m.id}

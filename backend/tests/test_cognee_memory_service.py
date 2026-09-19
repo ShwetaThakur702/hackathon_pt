@@ -28,7 +28,7 @@ def test_disabled_client_never_makes_http_call():
     service = CogneeMemoryService()
     service._settings = _configured_settings(cognee_enabled=False)
     with patch("app.integrations.cognee.cognee_memory_service.httpx.post") as mock_post:
-        result = service.remember("some text", "conversation", {"customer_id": "CUST001"})
+        result = service.remember("some text", "conversation", {"customer_id": "CUST-001"})
         assert result == {"stored": False, "reason": "not_configured"}
         assert service.recall("query") == []
         mock_post.assert_not_called()
@@ -43,7 +43,7 @@ def test_remember_posts_expected_payload_and_headers():
     mock_response.json.return_value = {"status": "completed"}
 
     with patch("app.integrations.cognee.cognee_memory_service.httpx.post", return_value=mock_response) as mock_post:
-        result = service.remember("Priya reported a failed payment.", "support_case", {"customer_id": "CUST001", "case_id": "CASE-1"})
+        result = service.remember("Priya reported a failed payment.", "support_case", {"customer_id": "CUST-001", "case_id": "CASE-1"})
 
     assert result["stored"] is True
     mock_post.assert_called_once()
@@ -75,7 +75,7 @@ def test_recall_parses_results():
     ]
 
     with patch("app.integrations.cognee.cognee_memory_service.httpx.post", return_value=mock_response):
-        results = service.recall("Abhi tak paise nahi aaye", node_name=["customer:CUST001"])
+        results = service.recall("Abhi tak paise nahi aaye", node_name=["customer:CUST-001"])
 
     assert len(results) == 1
     assert "Apollo Medicals" in results[0]["text"]

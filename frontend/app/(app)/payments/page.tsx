@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getCustomerTransactions } from "@/lib/api";
 import { useCustomer } from "@/lib/customer-context";
@@ -34,9 +35,14 @@ export default function PaymentsPage() {
 
   return (
     <div className="page-shell space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-ink">Payments</h1>
-        <p className="text-sm text-ink-secondary mt-1">Your UPI activity, verified against live transaction state.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-ink">Payments</h1>
+          <p className="text-sm text-ink-secondary mt-1">Your UPI activity, verified against live transaction state.</p>
+        </div>
+        <Link href="/payments/send" className="btn-primary btn-md shrink-0">
+          Send Money
+        </Link>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -44,8 +50,8 @@ export default function PaymentsPage() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`shrink-0 tap-target rounded-full px-4 py-1.5 text-sm font-medium border ${
-              filter === f ? "bg-brand-dark text-white border-brand-dark" : "border-border text-ink-secondary hover:border-brand"
+            className={`shrink-0 tap-target rounded-full px-4 py-1.5 text-sm font-medium border transition-all duration-150 active:scale-95 ${
+              filter === f ? "bg-brand-dark text-white border-brand-dark shadow-sm" : "border-border text-ink-secondary hover:border-brand hover:text-brand-dark"
             }`}
           >
             {f}
@@ -57,15 +63,17 @@ export default function PaymentsPage() {
         {loading ? (
           <div className="p-5 space-y-3">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-10 rounded-lg bg-surface animate-pulse" />
+              <div key={i} className="h-10 rounded-lg skeleton" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-sm text-ink-secondary">No transactions match this filter.</div>
         ) : (
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-border stagger-list">
             {filtered.map((t) => (
-              <TransactionRow key={t.id} txn={t} />
+              <div key={t.id} className="stagger-item">
+                <TransactionRow txn={t} />
+              </div>
             ))}
           </div>
         )}

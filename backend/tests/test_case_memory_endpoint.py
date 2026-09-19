@@ -8,7 +8,7 @@ from app.services.case_service import case_service
 
 
 def test_case_detail_never_calls_cognee(db_session, client, cognee_enabled):
-    case, _ = case_service.get_or_create_case(db_session, "CUST001", "TXN24001", "FAILED_PAYMENT")
+    case, _ = case_service.get_or_create_case(db_session, "CUST-001", "TXN24001", "FAILED_PAYMENT")
 
     with patch.object(cognee_enabled, "recall") as mock_recall:
         resp = client.get(f"/api/cases/{case.id}")
@@ -20,7 +20,7 @@ def test_case_detail_never_calls_cognee(db_session, client, cognee_enabled):
 
 
 def test_case_memory_endpoint_calls_cognee_when_configured(db_session, client, cognee_enabled):
-    case, _ = case_service.get_or_create_case(db_session, "CUST001", "TXN24001", "FAILED_PAYMENT")
+    case, _ = case_service.get_or_create_case(db_session, "CUST-001", "TXN24001", "FAILED_PAYMENT")
     hits = [{"text": "Priya previously reported this payment issue.", "score": None, "metadata": {}}]
 
     with patch.object(cognee_enabled, "recall", return_value=hits) as mock_recall:
@@ -34,7 +34,7 @@ def test_case_memory_endpoint_calls_cognee_when_configured(db_session, client, c
 
 
 def test_case_memory_endpoint_empty_when_not_configured(client):
-    case_resp = client.post("/api/tickets", json={"customer_id": "CUST001", "transaction_id": "TXN24001", "intent": "FAILED_PAYMENT"})
+    case_resp = client.post("/api/tickets", json={"customer_id": "CUST-001", "transaction_id": "TXN24001", "intent": "FAILED_PAYMENT"})
     case_id = case_resp.json()["ticket_id"]
 
     resp = client.get(f"/api/cases/{case_id}/memory")

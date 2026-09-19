@@ -78,7 +78,7 @@ export default function LanguageSelector({ variant = "card" }: { variant?: "card
     return (
       <div className="flex flex-col items-start w-full">
         {pill}
-        {error && <p className="text-[10px] text-red-600 mt-1">Couldn&apos;t save. Try again.</p>}
+        {error && <p className="text-[10px] text-danger mt-1">Couldn&apos;t save. Try again.</p>}
       </div>
     );
   }
@@ -90,7 +90,7 @@ export default function LanguageSelector({ variant = "card" }: { variant?: "card
         <span className="text-xs text-ink-secondary">{OPTIONS.find((o) => o.value === active)?.hint}</span>
       </div>
       {pill}
-      {error && <p className="text-xs text-red-600 mt-2">Couldn&apos;t save your language preference. Please try again.</p>}
+      {error && <p className="text-xs text-danger mt-2">Couldn&apos;t save your language preference. Please try again.</p>}
     </div>
   );
 }

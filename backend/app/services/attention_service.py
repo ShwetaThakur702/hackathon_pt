@@ -24,7 +24,10 @@ def get_attention_items(db: Session, customer_id: str) -> list[dict]:
         .order_by(Case.created_at.desc())
         .all()
     )
+    cased_transaction_ids = set()
     for case in open_cases:
+        if case.transaction_id:
+            cased_transaction_ids.add(case.transaction_id)
         txn = transaction_service.get_transaction(db, case.transaction_id) if case.transaction_id else None
         items.append(
             {
@@ -37,6 +40,26 @@ def get_attention_items(db: Session, customer_id: str) -> list[dict]:
                 "cta_href": f"/cases/{case.id}",
             }
         )
+
+    # Proactively surface a failed/debited payment even before the customer
+    # has said anything about it or a case exists yet — this is the core
+    # "Nishchint noticed it before you did" value prop (spec: "I caught a
+    # problem with this payment"), not just a reactive complaint tracker.
+    for txn in transaction_service.get_customer_transactions(db, customer_id, limit=50):
+        if txn["id"] in cased_transaction_ids:
+            continue
+        if txn["debited"] and txn["merchant_credited"] is not True and txn["refund_status"] == "PENDING":
+            items.append(
+                {
+                    "type": "TRANSACTION",
+                    "id": txn["id"],
+                    "title": f"₹{txn['amount']:.0f} · {txn.get('merchant_name') or 'Payment'}",
+                    "subtitle": "Payment failed · Amount debited",
+                    "amount": txn["amount"],
+                    "cta_label": "Investigate & Resolve",
+                    "cta_href": f"/transactions/{txn['id']}",
+                }
+            )
 
     for bill in bill_service.get_customer_bills(db, customer_id):
         if bill["nishchint_insight"]["has_issue"]:

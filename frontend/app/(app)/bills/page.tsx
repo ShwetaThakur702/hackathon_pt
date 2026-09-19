@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getBills, investigateBill } from "@/lib/api";
+import { useAssistant } from "@/lib/assistant-context";
 import { useCustomer } from "@/lib/customer-context";
 import type { Bill } from "@/types";
 
@@ -34,7 +35,7 @@ function BillCard({ bill, highlighted, onInvestigated }: { bill: Bill; highlight
   }
 
   return (
-    <div className={`card p-5 ${highlighted ? "ring-2 ring-brand" : ""}`}>
+    <div className={`stagger-item card card-hover p-5 transition-all duration-200 ${highlighted ? "ring-2 ring-brand animate-pop-in" : ""}`}>
       <div className="flex items-start justify-between">
         <div>
           <div className="text-xs text-ink-secondary">{CATEGORY_LABEL[bill.category] || bill.category}</div>
@@ -52,13 +53,9 @@ function BillCard({ bill, highlighted, onInvestigated }: { bill: Bill; highlight
         <div className="mt-4 rounded-lg bg-brand-light px-3 py-3">
           <p className="text-xs text-brand-dark">{bill.nishchint_insight.message}</p>
           {caseId ? (
-            <p className="text-xs text-success mt-2 font-medium">✓ Case {caseId} created — I&apos;m monitoring this.</p>
+            <p className="text-xs text-success mt-2 font-medium animate-fade-in-up">✓ Case {caseId} created — I&apos;m monitoring this.</p>
           ) : (
-            <button
-              onClick={handleInvestigate}
-              disabled={investigating}
-              className="mt-2 text-xs font-medium text-white bg-brand-dark rounded-lg px-3 py-1.5 hover:bg-brand-navy disabled:opacity-50"
-            >
+            <button onClick={handleInvestigate} disabled={investigating} className="btn-primary btn-sm mt-2">
               {investigating ? "Investigating…" : "Investigate"}
             </button>
           )}
@@ -71,7 +68,7 @@ function BillCard({ bill, highlighted, onInvestigated }: { bill: Bill; highlight
 
 export default function BillsPage() {
   return (
-    <Suspense fallback={<div className="page-shell h-32 rounded-xl bg-surface animate-pulse" />}>
+    <Suspense fallback={<div className="page-shell h-32 rounded-xl skeleton" />}>
       <BillsPageInner />
     </Suspense>
   );
@@ -79,6 +76,7 @@ export default function BillsPage() {
 
 function BillsPageInner() {
   const { customerId } = useCustomer();
+  const { setPageContext } = useAssistant();
   const searchParams = useSearchParams();
   const highlight = searchParams.get("highlight");
   const [bills, setBills] = useState<Bill[]>([]);
@@ -91,6 +89,19 @@ function BillsPageInner() {
 
   useEffect(load, [customerId]);
 
+  useEffect(() => {
+    const flagged = bills.find((b) => b.nishchint_insight.has_issue);
+    if (!flagged) {
+      setPageContext(null);
+      return;
+    }
+    setPageContext({
+      summary: `your ₹${flagged.amount.toLocaleString("en-IN")} ${flagged.provider_name} bill`,
+      suggestedMessage: "Your payment succeeded, but the provider has not updated the bill — can you check on this?",
+    });
+    return () => setPageContext(null);
+  }, [bills, setPageContext]);
+
   return (
     <div className="page-shell space-y-5">
       <div>
@@ -101,13 +112,13 @@ function BillsPageInner() {
       {loading ? (
         <div className="grid sm:grid-cols-2 gap-4">
           {[0, 1].map((i) => (
-            <div key={i} className="h-32 rounded-xl bg-surface animate-pulse" />
+            <div key={i} className="h-32 rounded-xl skeleton" />
           ))}
         </div>
       ) : bills.length === 0 ? (
         <div className="card p-8 text-center text-sm text-ink-secondary">No bills on file.</div>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid sm:grid-cols-2 gap-4 stagger-list">
           {bills.map((b) => (
             <BillCard
               key={b.id}

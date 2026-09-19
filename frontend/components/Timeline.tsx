@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from "framer-motion";
 import type { TimelineEvent } from "@/types";
 
 const EVENT_LABELS: Record<string, string> = {
@@ -24,21 +25,29 @@ const EVENT_LABELS: Record<string, string> = {
 
 export default function Timeline({ events }: { events: TimelineEvent[] }) {
   if (events.length === 0) {
-    return <div className="text-sm text-slate-400">No events yet.</div>;
+    return <div className="text-sm text-ink-secondary">No events yet.</div>;
   }
 
   return (
-    <ol className="relative border-l border-slate-200 ml-2">
-      {events.map((e, i) => (
-        <li key={i} className="mb-5 ml-4">
-          <div className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full bg-brand" />
-          <time className="text-xs text-slate-400">
-            {new Date(e.timestamp).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
-          </time>
-          <div className="text-sm font-medium text-slate-800">{EVENT_LABELS[e.event_type] || e.event_type}</div>
-          <div className="text-xs text-slate-400">by {e.actor}</div>
-        </li>
-      ))}
+    <ol className="relative border-l-2 border-border ml-2">
+      <AnimatePresence initial={false}>
+        {events.map((e, i) => (
+          <motion.li
+            key={`${e.event_type}-${e.timestamp}-${i}`}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1], delay: Math.min(i * 0.03, 0.3) }}
+            className="mb-5 ml-4"
+          >
+            <span className="absolute -left-[7px] mt-1.5 h-3 w-3 rounded-full bg-brand-dark ring-4 ring-white" />
+            <time className="text-xs text-ink-secondary">
+              {new Date(e.timestamp).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+            </time>
+            <div className="text-sm font-medium text-ink">{EVENT_LABELS[e.event_type] || e.event_type}</div>
+            <div className="text-xs text-ink-secondary">by {e.actor}</div>
+          </motion.li>
+        ))}
+      </AnimatePresence>
     </ol>
   );
 }

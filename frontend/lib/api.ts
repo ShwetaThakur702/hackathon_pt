@@ -114,6 +114,18 @@ export function getTransaction(transactionId: string) {
   return request<Transaction>(`/api/transactions/${transactionId}`);
 }
 
+export function sendPayment(
+  customerId: string,
+  recipientName: string,
+  recipientType: "CONTACT" | "MERCHANT",
+  amount: number
+) {
+  return request<Transaction>("/api/payments/send", {
+    method: "POST",
+    body: JSON.stringify({ customer_id: customerId, recipient_name: recipientName, recipient_type: recipientType, amount }),
+  });
+}
+
 export function getAttention(customerId: string) {
   return request<AttentionResponse>(`/api/nishchint/attention?customer_id=${customerId}`);
 }

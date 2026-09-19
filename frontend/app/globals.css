@@ -7,12 +7,30 @@ body {
   color: #1f2937;
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 999px;
+}
+
 .card {
-  @apply bg-white rounded-xl border border-border shadow-card;
+  @apply bg-white rounded-xl border border-border shadow-card transition-shadow duration-200;
+}
+
+/* Opt-in: clickable cards get a gentle lift on hover, not every card. */
+.card-hover {
+  @apply hover:shadow-[0_4px_16px_-4px_rgb(0,41,112,0.14)] hover:border-brand-light transition-all duration-200;
 }
 
 .badge {
-  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors duration-150;
 }
 
 .amount {
@@ -20,7 +38,7 @@ body {
 }
 
 .page-shell {
-  @apply max-w-6xl mx-auto px-4 sm:px-6 py-6;
+  @apply max-w-6xl mx-auto px-4 sm:px-6 py-6 animate-page-in;
 }
 
 .tap-target {
@@ -35,5 +53,94 @@ body {
 @media (min-width: 1024px) {
   .pb-bottom-nav {
     padding-bottom: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * Buttons — one consistent, animated system used everywhere instead of
+ * one-off className strings per page. Sizes give every CTA the same
+ * proportions (spec: "button size ... occupied ... perfect"); the shared
+ * transform/shadow transitions give every button the same feel.
+ * ------------------------------------------------------------------- */
+.btn {
+  @apply tap-target inline-flex items-center justify-center gap-1.5 rounded-lg font-medium
+    transition-all duration-150 ease-out
+    active:scale-[0.97]
+    disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100
+    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2;
+}
+.btn-sm { @apply text-xs px-3 py-1.5 rounded-md; }
+.btn-md { @apply text-sm px-4 py-2.5; }
+.btn-lg { @apply text-sm px-5 py-3; }
+
+.btn-primary {
+  @apply btn bg-brand-dark text-white shadow-sm hover:bg-brand-navy hover:shadow-md hover:-translate-y-px;
+}
+.btn-secondary {
+  @apply btn bg-white text-brand-dark border border-brand-light hover:border-brand hover:bg-brand-light/50;
+}
+.btn-outline {
+  @apply btn bg-transparent text-ink border border-border hover:border-brand hover:bg-surface;
+}
+.btn-danger {
+  @apply btn bg-danger text-white shadow-sm hover:opacity-90 hover:shadow-md hover:-translate-y-px;
+}
+.btn-ghost {
+  @apply btn bg-transparent text-ink-secondary hover:bg-surface hover:text-ink;
+}
+
+/* ---------------------------------------------------------------------
+ * Animations
+ * ------------------------------------------------------------------- */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-page-in {
+  animation: page-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.94); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-pop-in {
+  animation: pop-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #eef1f5 25%, #f7f9fb 50%, #eef1f5 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Stagger children of a list — apply `.stagger-list` to the container and
+ * `.stagger-item` to each row; nth-child delay does the rest, no JS. */
+.stagger-list .stagger-item {
+  animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.stagger-list .stagger-item:nth-child(1) { animation-delay: 0.03s; }
+.stagger-list .stagger-item:nth-child(2) { animation-delay: 0.07s; }
+.stagger-list .stagger-item:nth-child(3) { animation-delay: 0.11s; }
+.stagger-list .stagger-item:nth-child(4) { animation-delay: 0.15s; }
+.stagger-list .stagger-item:nth-child(5) { animation-delay: 0.19s; }
+.stagger-list .stagger-item:nth-child(6) { animation-delay: 0.23s; }
+.stagger-list .stagger-item:nth-child(n+7) { animation-delay: 0.26s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-page-in, .animate-fade-in-up, .animate-pop-in, .skeleton, .stagger-list .stagger-item {
+    animation: none !important;
   }
 }

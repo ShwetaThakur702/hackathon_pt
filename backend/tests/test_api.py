@@ -5,7 +5,7 @@ def test_health(client):
 def test_chat_creates_case_and_schedules_followup(client):
     resp = client.post(
         "/chat",
-        json={"customer_id": "CUST001", "message": "Mere 2400 kat gaye TXN24001 but payment fail dikha raha hai", "case_id": None},
+        json={"customer_id": "CUST-001", "message": "Mere 2400 kat gaye TXN24001 but payment fail dikha raha hai", "case_id": None},
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -22,11 +22,11 @@ def test_chat_creates_case_and_schedules_followup(client):
 def test_contextual_followup_reuses_existing_case(client):
     first = client.post(
         "/chat",
-        json={"customer_id": "CUST001", "message": "Mere 2400 kat gaye TXN24001 but payment fail dikha raha hai", "case_id": None},
+        json={"customer_id": "CUST-001", "message": "Mere 2400 kat gaye TXN24001 but payment fail dikha raha hai", "case_id": None},
     ).json()
 
     second = client.post(
-        "/chat", json={"customer_id": "CUST001", "message": "Abhi tak paise nahi aaye", "case_id": None}
+        "/chat", json={"customer_id": "CUST-001", "message": "Abhi tak paise nahi aaye", "case_id": None}
     ).json()
 
     assert second["case_id"] == first["case_id"]
@@ -39,7 +39,7 @@ def test_get_transaction(client):
 
 
 def test_create_dispute_endpoint(client):
-    ticket = client.post("/api/tickets", json={"customer_id": "CUST001", "transaction_id": "TXN24001", "intent": "FAILED_PAYMENT"}).json()
+    ticket = client.post("/api/tickets", json={"customer_id": "CUST-001", "transaction_id": "TXN24001", "intent": "FAILED_PAYMENT"}).json()
     resp = client.post(
         "/api/disputes",
         json={"case_id": ticket["ticket_id"], "transaction_id": "TXN24001", "reason": "REFUND_DEADLINE_BREACHED"},
@@ -49,7 +49,7 @@ def test_create_dispute_endpoint(client):
 
 
 def test_followups_endpoint(client):
-    ticket = client.post("/api/tickets", json={"customer_id": "CUST001", "transaction_id": "TXN24001", "intent": "FAILED_PAYMENT"}).json()
+    ticket = client.post("/api/tickets", json={"customer_id": "CUST-001", "transaction_id": "TXN24001", "intent": "FAILED_PAYMENT"}).json()
     # Arbitrary future timestamp — this test only checks create+fetch
     # round-tripping, not policy math, so it doesn't need to be anchored
     # to "today" like the seed data / other followup tests are.
@@ -74,7 +74,7 @@ def test_simulation_advance_and_reset(client):
 def test_end_to_end_advance_to_deadline_raises_dispute(client):
     chat_resp = client.post(
         "/chat",
-        json={"customer_id": "CUST001", "message": "Mere 2400 kat gaye TXN24001 but payment fail dikha raha hai", "case_id": None},
+        json={"customer_id": "CUST-001", "message": "Mere 2400 kat gaye TXN24001 but payment fail dikha raha hai", "case_id": None},
     ).json()
 
     advance_resp = client.post("/api/simulate/advance-to-deadline")

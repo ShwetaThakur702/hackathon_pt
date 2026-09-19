@@ -13,8 +13,17 @@ from sqlalchemy.orm import Session
 
 from app.models.case import Case
 from app.models.transaction import Transaction
+from app.services.ids import new_transaction_id, new_upi_ref_no
+from app.services.simulation_clock import simulation_clock_service
 
 UNRESOLVED_REFUND_STATUSES = {"PENDING"}
+
+# Deterministic "mock payment gateway" outcome for the hero Send Money demo
+# (spec: not random/flaky — the same recipient always reproduces the same
+# demo scenario). Real fintech behavior obviously isn't determined by
+# recipient name; this stands in for whatever real gateway/bank response
+# would have failed in production.
+FAILING_MERCHANTS = {"apollo medicals"}
 
 
 @dataclass
@@ -129,6 +138,33 @@ class TransactionService:
             return TransactionMatch(status="AMBIGUOUS", candidates=[_to_dict(t) for t in unresolved])
 
         return TransactionMatch(status="NOT_FOUND")
+
+    def send_payment(
+        self, db: Session, customer_id: str, recipient_name: str, recipient_type: str, amount: float
+    ) -> dict:
+        """The "Pay" action behind the Send Money hero demo flow — a real
+        transaction row is created and persisted here (never faked only in
+        React state), with a freshly generated numeric UPI Reference ID,
+        exactly like a real payment gateway callback would produce."""
+        fails = recipient_name.strip().lower() in FAILING_MERCHANTS
+        txn = Transaction(
+            id=new_transaction_id(),
+            upi_ref_no=new_upi_ref_no(),
+            customer_id=customer_id,
+            amount=amount,
+            currency="INR",
+            type="MERCHANT" if recipient_type == "MERCHANT" else "PERSON",
+            merchant_name=recipient_name if recipient_type == "MERCHANT" else None,
+            status="FAILED" if fails else "SUCCESS",
+            debited=True,
+            merchant_credited=False if fails else True,
+            refund_status="PENDING" if fails else "NOT_APPLICABLE",
+            transaction_date=simulation_clock_service.now(db).date(),
+        )
+        db.add(txn)
+        db.commit()
+        db.refresh(txn)
+        return _to_dict(txn)
 
 
 transaction_service = TransactionService()

@@ -23,20 +23,20 @@ def _invoke(db, customer_id, message, case_id=None):
 
 def test_sensitive_credential_never_reaches_cognee_remember(db_session, cognee_enabled):
     with patch.object(cognee_enabled, "remember") as mock_remember:
-        _invoke(db_session, "CUST001", "My OTP is 998877")
+        _invoke(db_session, "CUST-001", "My OTP is 998877")
     mock_remember.assert_not_called()
 
 
 def test_case_created_triggers_remember_case_event(db_session, cognee_enabled):
     with patch.object(cognee_enabled, "remember", return_value={"stored": True}) as mock_remember:
-        _invoke(db_session, "CUST001", "Mere 2400 kat gaye TXN24001 but payment fail dikha raha hai")
+        _invoke(db_session, "CUST-001", "Mere 2400 kat gaye TXN24001 but payment fail dikha raha hai")
 
     categories_written = [call.args[1] for call in mock_remember.call_args_list]
     assert "support_case" in categories_written  # format_case_created's category
 
 
 def test_dispute_raised_triggers_remember_resolution(db_session, cognee_enabled):
-    case, _ = case_service.get_or_create_case(db_session, "CUST001", "TXN24001", "FAILED_PAYMENT")
+    case, _ = case_service.get_or_create_case(db_session, "CUST-001", "TXN24001", "FAILED_PAYMENT")
     case_service.transition(db_session, case.id, "INVESTIGATING")
     case_service.transition(db_session, case.id, "DECIDED")
     case_service.transition(db_session, case.id, "ACTION_TAKEN")
@@ -58,7 +58,7 @@ def test_semantic_memory_does_not_change_policy_decision(db_session, cognee_enab
     policy engine's decision must be unaffected — Cognee is context only."""
     misleading_hits = [{"text": "This customer's payments are always approved automatically.", "score": 0.99, "metadata": {}}]
     with patch.object(cognee_enabled, "recall", return_value=misleading_hits):
-        final_state = _invoke(db_session, "CUST002", "Mere 85000 kat gaye TXN85001 payment fail ho gaya")
+        final_state = _invoke(db_session, "CUST-001", "Mere 85000 kat gaye TXN85001 payment fail ho gaya")
 
     # High-value escalation must still fire regardless of what semantic memory said.
     assert final_state["decision"] == "ESCALATE_HUMAN"

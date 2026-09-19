@@ -5,12 +5,12 @@ export default function MemoryPanel({ memory, loading = false }: { memory: Memor
     return (
       <div className="card p-4">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-ink">Memory &amp; Context</h3>
+          <h3 className="text-sm font-semibold text-ink">Relevant history</h3>
           <span className="badge bg-surface text-ink-secondary">Loading…</span>
         </div>
         <div className="space-y-2">
-          <div className="h-3 w-3/4 rounded bg-surface animate-pulse" />
-          <div className="h-3 w-1/2 rounded bg-surface animate-pulse" />
+          <div className="h-3 w-3/4 rounded skeleton" />
+          <div className="h-3 w-1/2 rounded skeleton" />
         </div>
       </div>
     );
@@ -19,8 +19,8 @@ export default function MemoryPanel({ memory, loading = false }: { memory: Memor
   if (!memory) {
     return (
       <div className="card p-4">
-        <h3 className="text-sm font-semibold text-ink mb-1">Memory &amp; Context</h3>
-        <p className="text-xs text-ink-secondary">Couldn&apos;t load semantic memory right now — the rest of the case is unaffected.</p>
+        <h3 className="text-sm font-semibold text-ink mb-1">Relevant history</h3>
+        <p className="text-xs text-ink-secondary">Couldn&apos;t load your history right now — the rest of the case is unaffected.</p>
       </div>
     );
   }
@@ -28,17 +28,12 @@ export default function MemoryPanel({ memory, loading = false }: { memory: Memor
   return (
     <div className="card p-4">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-ink">Memory &amp; Context</h3>
-        <span className={`badge ${memory.cognee_configured ? "bg-success-light text-success" : "bg-surface text-ink-secondary"}`}>
-          {memory.cognee_configured ? "Semantic memory active" : "Semantic memory not configured"}
-        </span>
+        <h3 className="text-sm font-semibold text-ink">Relevant history</h3>
+        {memory.cognee_configured && <span className="badge bg-success-light text-success">Previous interaction found</span>}
       </div>
 
       {!memory.cognee_configured && (
-        <p className="text-xs text-ink-secondary">
-          Cognee isn&apos;t configured in this environment — the case still uses the database&apos;s current-case memory
-          (open cases, recent messages). Set COGNEE_API_KEY/COGNEE_BASE_URL to enable long-term semantic memory.
-        </p>
+        <p className="text-xs text-ink-secondary">Nothing on file yet for this account.</p>
       )}
 
       {memory.cognee_configured && (

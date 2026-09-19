@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { getCase, getTransaction, listCases, sendChatMessage } from "@/lib/api";
 import { useAssistant } from "@/lib/assistant-context";
 import { useCustomer } from "@/lib/customer-context";
@@ -10,11 +11,20 @@ import { displayStatus } from "@/lib/transaction-status";
 import type { CaseDetail, CaseListItem, Transaction } from "@/types";
 import AutonomousLoopStrip from "@/components/AutonomousLoopStrip";
 import { SparkleIcon } from "@/components/shell/icons";
+import CopyReferenceId from "@/components/CopyReferenceId";
 
 function CheckRow({ label, done }: { label: string; done: boolean }) {
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className={done ? "text-success" : "text-border"}>{done ? "✓" : "○"}</span>
+      <motion.span
+        key={String(done)}
+        initial={done ? { scale: 0.5, opacity: 0 } : false}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 400, damping: 15 }}
+        className={done ? "text-success" : "text-border"}
+      >
+        {done ? "✓" : "○"}
+      </motion.span>
       <span className={done ? "text-ink" : "text-ink-secondary"}>{label}</span>
     </div>
   );
@@ -59,7 +69,7 @@ export default function TransactionDetailPage() {
     if (!txn) return;
     setPageContext({
       summary: `this ₹${txn.amount.toLocaleString("en-IN")} ${txn.merchant_name ? txn.merchant_name + " " : ""}payment`,
-      suggestedMessage: `I have an issue with my ₹${txn.amount} payment${txn.merchant_name ? " to " + txn.merchant_name : ""} (UPI Ref No ${txn.upi_ref_no}).`,
+      suggestedMessage: `I have an issue with my ₹${txn.amount} payment${txn.merchant_name ? " to " + txn.merchant_name : ""} (UPI Reference ID ${txn.upi_ref_no}).`,
     });
     return () => setPageContext(null);
   }, [txn, setPageContext]);
@@ -69,7 +79,7 @@ export default function TransactionDetailPage() {
     setResolving(true);
     setResolveActions([]);
     try {
-      const message = `I have an issue with my ₹${txn.amount} payment${txn.merchant_name ? " to " + txn.merchant_name : ""} (UPI Ref No ${txn.upi_ref_no}). It shows as ${txn.status.toLowerCase()}.`;
+      const message = `I have an issue with my ₹${txn.amount} payment${txn.merchant_name ? " to " + txn.merchant_name : ""} (UPI Reference ID ${txn.upi_ref_no}). It shows as ${txn.status.toLowerCase()}.`;
       const resp = await sendChatMessage(customerId, message, null);
       setResolveActions(resp.actions);
       await load();
@@ -83,8 +93,8 @@ export default function TransactionDetailPage() {
   if (loading) {
     return (
       <div className="page-shell space-y-4">
-        <div className="h-32 rounded-xl bg-surface animate-pulse" />
-        <div className="h-48 rounded-xl bg-surface animate-pulse" />
+        <div className="h-32 rounded-xl skeleton" />
+        <div className="h-48 rounded-xl skeleton" />
       </div>
     );
   }
@@ -99,7 +109,7 @@ export default function TransactionDetailPage() {
 
   return (
     <div className="page-shell space-y-5">
-      <button onClick={() => router.back()} className="text-sm text-brand-dark">
+      <button onClick={() => router.back()} className="text-sm text-brand-dark hover:-translate-x-0.5 transition-transform duration-150 inline-flex items-center gap-1">
         ← Back
       </button>
 
@@ -111,8 +121,10 @@ export default function TransactionDetailPage() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6 text-sm">
           <div>
-            <div className="text-ink-secondary text-xs">UPI Ref No</div>
-            <div className="font-mono text-xs mt-1">{txn.upi_ref_no}</div>
+            <div className="text-ink-secondary text-xs">UPI Reference ID</div>
+            <div className="mt-1">
+              <CopyReferenceId value={txn.upi_ref_no} />
+            </div>
           </div>
           <div>
             <div className="text-ink-secondary text-xs">Date</div>
@@ -182,7 +194,7 @@ export default function TransactionDetailPage() {
                 </div>
               )}
             </div>
-            <Link href={`/cases/${caseDetail.id}`} className="inline-block text-sm font-medium text-brand-dark">
+            <Link href={`/cases/${caseDetail.id}`} className="inline-flex items-center text-sm font-medium text-brand-dark hover:underline transition-all">
               View full case →
             </Link>
           </div>
@@ -193,15 +205,11 @@ export default function TransactionDetailPage() {
               did not complete.
             </p>
             {resolveActions === null ? (
-              <button
-                onClick={investigateAndResolve}
-                disabled={resolving}
-                className="tap-target rounded-lg bg-brand-dark text-white text-sm font-medium px-5 py-2.5 hover:bg-brand-navy disabled:opacity-50"
-              >
+              <button onClick={investigateAndResolve} disabled={resolving} className="btn-primary btn-lg">
                 {resolving ? "Investigating…" : "Investigate & Resolve"}
               </button>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 animate-fade-in-up">
                 <CheckRow label="Identified transaction" done />
                 <CheckRow label="Verified current status" done />
                 <CheckRow label="Checked previous support history" done />

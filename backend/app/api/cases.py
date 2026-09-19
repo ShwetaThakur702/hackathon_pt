@@ -43,9 +43,14 @@ def _case_detail(db: Session, case_id: str) -> dict:
 
     customer = db.get(Customer, case.customer_id)
     transaction = transaction_service.get_transaction(db, case.transaction_id) if case.transaction_id else None
+    now = simulation_clock_service.now(db)
     policy_result = None
     if transaction:
-        now = simulation_clock_service.now(db)
+        # Recomputed fresh on every read from (transaction, current demo-clock
+        # time) — never a stored/stale snapshot. This is the ONE authoritative
+        # compensation number; Dispute.compensation_amount (below) is kept
+        # only as the audit-trail record of what was calculated the last time
+        # a follow-up actually ran, not what the UI should display as "now".
         policy_result = policy_engine.evaluate(transaction, now).to_dict()
 
     followup = followup_service.get_active_followup_for_case(db, case_id)
@@ -71,6 +76,13 @@ def _case_detail(db: Session, case_id: str) -> dict:
         "customer": {"id": customer.id, "name": customer.name, "preferred_language": customer.preferred_language} if customer else None,
         "transaction": transaction,
         "policy_result": policy_result,
+        # Convenience mirrors of policy_result's live numbers, for a UI that
+        # just wants "the current number" without reaching into a nested
+        # object — always in sync with policy_result since both come from
+        # the same evaluate() call above.
+        "current_demo_time": now.isoformat(),
+        "days_overdue": policy_result["days_overdue"] if policy_result else None,
+        "current_compensation": policy_result["compensation"] if policy_result else None,
         "messages": messages,
         "timeline": _timeline(db, case_id),
         "followup": (
@@ -95,20 +107,34 @@ def _case_detail(db: Session, case_id: str) -> dict:
 @router.get("/cases")
 def list_cases(status: str | None = None, priority: str | None = None, customer_id: str | None = None, db: Session = Depends(get_db)):
     cases = case_service.list_cases(db, status=status, priority=priority, customer_id=customer_id)
-    return [
-        {
-            "id": c.id,
-            "customer_id": c.customer_id,
-            "transaction_id": c.transaction_id,
-            "intent": c.intent,
-            "status": c.status,
-            "priority": c.priority,
-            "escalation_reason": c.escalation_reason,
-            "created_at": c.created_at.isoformat(),
-            "closed_at": c.closed_at.isoformat() if c.closed_at else None,
-        }
-        for c in cases
-    ]
+    now = simulation_clock_service.now(db)
+    result = []
+    for c in cases:
+        transaction = transaction_service.get_transaction(db, c.transaction_id) if c.transaction_id else None
+        # Compensation is always recomputed live from the policy engine here
+        # too (never a stale stored snapshot) — same authority the case
+        # detail page uses, so the list and detail views never disagree.
+        policy_result = policy_engine.evaluate(transaction, now).to_dict() if transaction else None
+        result.append(
+            {
+                "id": c.id,
+                "customer_id": c.customer_id,
+                "transaction_id": c.transaction_id,
+                "upi_ref_no": transaction["upi_ref_no"] if transaction else None,
+                "merchant_name": transaction["merchant_name"] if transaction else None,
+                "amount": transaction["amount"] if transaction else None,
+                "intent": c.intent,
+                "status": c.status,
+                "priority": c.priority,
+                "escalation_reason": c.escalation_reason,
+                "deadline": policy_result["deadline"] if policy_result else None,
+                "days_overdue": policy_result["days_overdue"] if policy_result else None,
+                "current_compensation": policy_result["compensation"] if policy_result else None,
+                "created_at": c.created_at.isoformat(),
+                "closed_at": c.closed_at.isoformat() if c.closed_at else None,
+            }
+        )
+    return result
 
 
 @router.get("/cases/{case_id}")

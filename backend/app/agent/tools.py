@@ -77,6 +77,13 @@ def schedule_followup(db: Session, case_id: str, scheduled_for: datetime) -> dic
 
 def raise_dispute(db: Session, case_id: str, transaction_id: str, reason: str, compensation_amount: float) -> dict:
     dispute, created = dispute_service.raise_dispute(db, case_id, transaction_id, reason, compensation_amount)
+    if not created:
+        # The customer messaged again about an already-disputed case (e.g.
+        # "abhi tak paise nahi aaye") on a later demo day — recompute
+        # against today's overdue-day count so the persisted/audit amount
+        # keeps pace with the live number the chat reply itself already
+        # uses, exactly like the daily follow-up loop does.
+        dispute = dispute_service.update_compensation(db, dispute, compensation_amount)
     return {"dispute_id": dispute.id, "created": created, "status": dispute.status}
 
 

@@ -50,20 +50,20 @@ def test_fallback_response_covers_all_situations_in_all_languages():
 
 
 def test_update_customer_language_persists_and_is_single_source_of_truth(client, db_session):
-    resp = client.put("/api/customers/CUST002/language", json={"preferred_language": "Hinglish"})
+    resp = client.put("/api/customers/CUST-001/language", json={"preferred_language": "Hinglish"})
     assert resp.status_code == 200
     assert resp.json()["preferred_language"] == "Hinglish"
 
     db_session.expire_all()
-    customer = db_session.get(Customer, "CUST002")
+    customer = db_session.get(Customer, "CUST-001")
     assert customer.preferred_language == "Hinglish"
 
-    get_resp = client.get("/api/customers/CUST002")
+    get_resp = client.get("/api/customers/CUST-001")
     assert get_resp.json()["preferred_language"] == "Hinglish"
 
 
 def test_update_customer_language_rejects_unknown_value(client):
-    resp = client.put("/api/customers/CUST002/language", json={"preferred_language": "French"})
+    resp = client.put("/api/customers/CUST-001/language", json={"preferred_language": "French"})
     assert resp.status_code == 422
 
 

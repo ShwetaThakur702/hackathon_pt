@@ -131,3 +131,49 @@ export function MicIcon({ className = base }: IconProps) {
     </svg>
   );
 }
+
+export function PlaneIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <path
+        d="M12 3v7l7 4v2l-7-2v4l2 1.5V21l-3-1-3 1v-1.5L10 18v-4l-7 2v-2l7-4V3a1.4 1.4 0 0 1 2.8 0Z"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function TrainIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <rect x="5" y="4" width="14" height="13" rx="3" />
+      <path d="M5 12h14M9 17l-2 3M15 17l2 3" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="9" cy="8.5" r="0.6" fill="currentColor" />
+      <circle cx="15" cy="8.5" r="0.6" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function BusIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <rect x="4" y="5" width="16" height="11" rx="2.5" />
+      <path d="M4 11h16M7 16v2M17 16v2" strokeLinecap="round" />
+      <circle cx="8" cy="9" r="0.6" fill="currentColor" />
+      <circle cx="16" cy="9" r="0.6" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function GiftIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <rect x="4" y="9" width="16" height="11" rx="1.5" />
+      <path d="M4 13h16M12 9v11" strokeLinecap="round" />
+      <path
+        d="M12 9C10.5 5 6 5 6 7.5S9 9 12 9c3 0-3 0 0 0s6-1.5 6-1.5S13.5 5 12 9Z"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

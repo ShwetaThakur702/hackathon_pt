@@ -12,6 +12,7 @@
       "name": "Webhook: Follow-up Scheduled",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
+      "notes": "responseMode=onReceived acknowledges the scheduling request immediately (spec section 20) — the backend caller (FollowupService.schedule) never waits on this workflow's Wait node.",
       "position": [-100, 300]
     },
     {
@@ -19,68 +20,22 @@
         "conditions": {
           "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
           "conditions": [
-            {
-              "leftValue": "={{$json.body.followup_id}}",
-              "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty" }
-            },
-            {
-              "leftValue": "={{$json.body.case_id}}",
-              "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty" }
-            }
+            { "leftValue": "={{$json.body.event_id || $json.body.followup_id}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } },
+            { "leftValue": "={{$json.body.case_id}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } },
+            { "leftValue": "={{$json.body.customer_id}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } },
+            { "leftValue": "={{$json.body.next_check_at || $json.body.scheduled_for}}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } },
+            { "leftValue": "={{ !$json.body.upi_reference_id || /^[0-9]+$/.test($json.body.upi_reference_id) }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }
           ],
           "combinator": "and"
         },
         "options": {}
       },
       "id": "1a1b1c1d-0002-4a4a-9a9a-000000000002",
-      "name": "Validate Payload",
+      "name": "Validate & Normalize Payload",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
+      "notes": "event_id/followup_id, case_id, customer_id and a next-check timestamp must all be present; if a upi_reference_id is included it must be purely numeric. No business deadline math happens here — only presence/shape checks.",
       "position": [120, 300]
-    },
-    {
-      "parameters": {
-        "resume": "specificTime",
-        "dateTime": "={{$json.body.scheduled_for}}"
-      },
-      "id": "1a1b1c1d-0003-4a4a-9a9a-000000000003",
-      "name": "Wait Until Deadline",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "webhookId": "nishchint-followup-wait",
-      "position": [340, 220]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{$env.BACKEND_BASE_URL}}/api/workflows/execute-followup",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ followup_id: $('Webhook: Follow-up Scheduled').item.json.body.followup_id }) }}",
-        "options": {}
-      },
-      "id": "1a1b1c1d-0004-4a4a-9a9a-000000000004",
-      "name": "Execute Follow-up (Recheck + Decide + Act)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [560, 220]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{$env.BACKEND_BASE_URL}}/api/workflows/followup-result",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ case_id: $json.case_id, workflow_id: $execution.id, result: $json.result, dispute_id: $json.dispute_id || null, secret: $env.N8N_CALLBACK_SECRET }) }}",
-        "options": {}
-      },
-      "id": "1a1b1c1d-0005-4a4a-9a9a-000000000005",
-      "name": "Report Result to Backend (audit callback)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [780, 220]
     },
     {
       "parameters": {},
@@ -88,26 +43,262 @@
       "name": "Invalid Payload - No-op",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [340, 420]
+      "notes": "Malformed payload — safe termination. No backend call is made.",
+      "position": [340, 560]
+    },
+    {
+      "parameters": {
+        "resume": "specificTime",
+        "dateTime": "={{$json.body.next_check_at || $json.body.scheduled_for}}"
+      },
+      "id": "1a1b1c1d-0003-4a4a-9a9a-000000000003",
+      "name": "Wait - Next Check",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "webhookId": "nishchint-followup-wait",
+      "notes": "Waits until the backend-supplied timestamp — never a hardcoded delay, never a T+1/T+5 calculation done here. Reused as-is for UPI, refund, bill, FASTag and AutoPay follow-ups; only the payload differs.",
+      "position": [340, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_BASE_URL}}/api/workflows/execute-followup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ followup_id: $('Webhook: Follow-up Scheduled').item.json.body.followup_id, event_id: $('Webhook: Follow-up Scheduled').item.json.body.event_id }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "1a1b1c1d-0004-4a4a-9a9a-000000000004",
+      "name": "Execute Follow-up - Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "The ONLY place a decision is made — the backend rechecks the transaction, re-evaluates the deterministic policy engine, and performs the action. Safe to retry: idempotent per followup_id, so a network failure after a real dispute-raise never raises a second one — a retry just returns the same outcome.",
+      "position": [560, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "leftValue": "={{$json.outcome}}", "rightValue": "RESOLVED", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1a1b1c1d-0007-4a4a-9a9a-000000000007",
+      "name": "Switch - Resolved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "notes": "First half of the 3-way Switch - Follow-up Outcome branch (RESOLVED / ACTION_TAKEN-ESCALATED / CONTINUE_MONITORING), built from two chained IF nodes for schema reliability. Branches on the backend's own `outcome` field — never recomputed here.",
+      "position": [780, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "leftValue": "={{$json.outcome}}", "rightValue": "DISPUTE_RAISED", "operator": { "type": "string", "operation": "equals" } },
+            { "leftValue": "={{$json.outcome}}", "rightValue": "ESCALATED", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "1a1b1c1d-0008-4a4a-9a9a-000000000008",
+      "name": "Switch - Action Taken or Escalated?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "notes": "Second half of the outcome switch. False output here means CONTINUE_MONITORING (the still-pending / not-yet-breached case).",
+      "position": [1000, 340]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_BASE_URL}}/api/workflows/followup-result",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ case_id: $('Execute Follow-up - Backend').item.json.case_id, customer_id: $('Execute Follow-up - Backend').item.json.customer_id, event_id: $('Webhook: Follow-up Scheduled').item.json.body.event_id, correlation_id: $('Webhook: Follow-up Scheduled').item.json.body.correlation_id, workflow_id: $execution.id, result: $('Execute Follow-up - Backend').item.json.result, outcome: $('Execute Follow-up - Backend').item.json.outcome, action_taken: $('Execute Follow-up - Backend').item.json.action_taken, current_compensation: $('Execute Follow-up - Backend').item.json.current_compensation, next_check_at: $('Execute Follow-up - Backend').item.json.next_check_at }) }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "=Bearer {{$env.N8N_CALLBACK_SECRET}}" } ] },
+        "options": { "timeout": 15000 }
+      },
+      "id": "1a1b1c1d-0005-4a4a-9a9a-000000000005a",
+      "name": "Report Result - Backend (Resolved)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "Audit-only report — current_compensation and every other value here is forwarded verbatim from the backend's own response, never computed in n8n.",
+      "position": [1220, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_BASE_URL}}/api/workflows/notify-customer",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ case_id: $('Execute Follow-up - Backend').item.json.case_id, customer_id: $('Execute Follow-up - Backend').item.json.customer_id, notification_type: 'CASE_RESOLVED', message: $('Execute Follow-up - Backend').item.json.notification_message }) }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "=Bearer {{$env.N8N_CALLBACK_SECRET}}" } ] },
+        "options": { "timeout": 15000 }
+      },
+      "id": "1a1b1c1d-0009-4a4a-9a9a-000000000009a",
+      "name": "Notify Customer (Resolved)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "The message text is whatever /execute-followup already generated and sent — this call is dedup'd server-side on an exact (customer_id, case_id, message) match, so it can never double-notify even on retry.",
+      "position": [1440, 100]
+    },
+    {
+      "parameters": {},
+      "id": "1a1b1c1d-000a-4a4a-9a9a-00000000000a",
+      "name": "Memory Recorded (Resolved)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "notes": "No action here by design (spec section 15): the backend's MemoryService already wrote the resolution event to Cognee inside /execute-followup, atomically with the decision. A second, independent n8n -> Cognee write would duplicate memory logic.",
+      "position": [1660, 100]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_BASE_URL}}/api/workflows/followup-result",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ case_id: $('Execute Follow-up - Backend').item.json.case_id, customer_id: $('Execute Follow-up - Backend').item.json.customer_id, event_id: $('Webhook: Follow-up Scheduled').item.json.body.event_id, correlation_id: $('Webhook: Follow-up Scheduled').item.json.body.correlation_id, workflow_id: $execution.id, result: $('Execute Follow-up - Backend').item.json.result, outcome: $('Execute Follow-up - Backend').item.json.outcome, action_taken: $('Execute Follow-up - Backend').item.json.action_taken, current_compensation: $('Execute Follow-up - Backend').item.json.current_compensation, next_check_at: $('Execute Follow-up - Backend').item.json.next_check_at }) }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "=Bearer {{$env.N8N_CALLBACK_SECRET}}" } ] },
+        "options": { "timeout": 15000 }
+      },
+      "id": "1a1b1c1d-0005-4a4a-9a9a-000000000005b",
+      "name": "Report Result - Backend (Action Taken)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "Covers DISPUTE_RAISED and ESCALATED. current_compensation is the backend/policy-engine value (e.g. 200) — n8n only forwards it, never calculates it.",
+      "position": [1220, 340]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_BASE_URL}}/api/workflows/notify-customer",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ case_id: $('Execute Follow-up - Backend').item.json.case_id, customer_id: $('Execute Follow-up - Backend').item.json.customer_id, notification_type: 'CASE_UPDATE', message: $('Execute Follow-up - Backend').item.json.notification_message }) }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "=Bearer {{$env.N8N_CALLBACK_SECRET}}" } ] },
+        "options": { "timeout": 15000 }
+      },
+      "id": "1a1b1c1d-0009-4a4a-9a9a-000000000009b",
+      "name": "Notify Customer (Action Taken)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "e.g. \"Your payment issue remained unresolved after the applicable resolution window. Nishchint has raised a dispute and will continue tracking it.\" — generated by the backend (LLM + verified facts only), not n8n.",
+      "position": [1440, 340]
+    },
+    {
+      "parameters": {},
+      "id": "1a1b1c1d-000a-4a4a-9a9a-00000000000b",
+      "name": "Memory Recorded (Action Taken)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "notes": "Already written to Cognee by the backend's MemoryService during /execute-followup (remember_resolution). See the note on \"Memory Recorded (Resolved)\".",
+      "position": [1660, 340]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_BASE_URL}}/api/workflows/followup-result",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ case_id: $('Execute Follow-up - Backend').item.json.case_id, customer_id: $('Execute Follow-up - Backend').item.json.customer_id, event_id: $('Webhook: Follow-up Scheduled').item.json.body.event_id, correlation_id: $('Webhook: Follow-up Scheduled').item.json.body.correlation_id, workflow_id: $execution.id, result: $('Execute Follow-up - Backend').item.json.result, outcome: $('Execute Follow-up - Backend').item.json.outcome, action_taken: $('Execute Follow-up - Backend').item.json.action_taken, current_compensation: $('Execute Follow-up - Backend').item.json.current_compensation, next_check_at: $('Execute Follow-up - Backend').item.json.next_check_at }) }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "=Bearer {{$env.N8N_CALLBACK_SECRET}}" } ] },
+        "options": { "timeout": 15000 }
+      },
+      "id": "1a1b1c1d-0005-4a4a-9a9a-000000000005c",
+      "name": "Report Result - Backend (Monitoring)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "STILL_PENDING / CONTINUE_MONITORING. No customer notification for a routine not-yet-breached recheck — matches existing behavior.",
+      "position": [1220, 500]
+    },
+    {
+      "parameters": {},
+      "id": "1a1b1c1d-000b-4a4a-9a9a-00000000000c",
+      "name": "Next Check Scheduled by Backend",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "notes": "This execution ends here on purpose. The backend already scheduled the next Followup row (next_check_at above) and — via the SAME FollowupService.schedule() path that started this run — will fire a brand-new 'Follow-up Scheduled' webhook when it's time, starting a fresh, independent workflow execution. This avoids looping a single long-running n8n execution and keeps each run's idempotency key (followup_id/event_id) unambiguous. See n8n/README.md \"How the autonomous loop continues\".",
+      "position": [1440, 500]
     }
   ],
   "connections": {
     "Webhook: Follow-up Scheduled": {
-      "main": [[{ "node": "Validate Payload", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Validate & Normalize Payload", "type": "main", "index": 0 }]]
     },
-    "Validate Payload": {
+    "Validate & Normalize Payload": {
       "main": [
-        [{ "node": "Wait Until Deadline", "type": "main", "index": 0 }],
+        [{ "node": "Wait - Next Check", "type": "main", "index": 0 }],
         [{ "node": "Invalid Payload - No-op", "type": "main", "index": 0 }]
       ]
     },
-    "Wait Until Deadline": {
-      "main": [[{ "node": "Execute Follow-up (Recheck + Decide + Act)", "type": "main", "index": 0 }]]
+    "Wait - Next Check": {
+      "main": [[{ "node": "Execute Follow-up - Backend", "type": "main", "index": 0 }]]
     },
-    "Execute Follow-up (Recheck + Decide + Act)": {
-      "main": [[{ "node": "Report Result to Backend (audit callback)", "type": "main", "index": 0 }]]
+    "Execute Follow-up - Backend": {
+      "main": [[{ "node": "Switch - Resolved?", "type": "main", "index": 0 }]]
+    },
+    "Switch - Resolved?": {
+      "main": [
+        [{ "node": "Report Result - Backend (Resolved)", "type": "main", "index": 0 }],
+        [{ "node": "Switch - Action Taken or Escalated?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Switch - Action Taken or Escalated?": {
+      "main": [
+        [{ "node": "Report Result - Backend (Action Taken)", "type": "main", "index": 0 }],
+        [{ "node": "Report Result - Backend (Monitoring)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Report Result - Backend (Resolved)": {
+      "main": [[{ "node": "Notify Customer (Resolved)", "type": "main", "index": 0 }]]
+    },
+    "Notify Customer (Resolved)": {
+      "main": [[{ "node": "Memory Recorded (Resolved)", "type": "main", "index": 0 }]]
+    },
+    "Report Result - Backend (Action Taken)": {
+      "main": [[{ "node": "Notify Customer (Action Taken)", "type": "main", "index": 0 }]]
+    },
+    "Notify Customer (Action Taken)": {
+      "main": [[{ "node": "Memory Recorded (Action Taken)", "type": "main", "index": 0 }]]
+    },
+    "Report Result - Backend (Monitoring)": {
+      "main": [[{ "node": "Next Check Scheduled by Backend", "type": "main", "index": 0 }]]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "meta": { "instanceId": "nishchint-prototype" }
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "nishchint-prototype"
+  }
 }

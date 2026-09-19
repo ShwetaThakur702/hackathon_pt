@@ -45,7 +45,7 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
           .map((t) => ({
             key: `txn-${t.id}`,
             label: `₹${t.amount.toLocaleString("en-IN")} · ${t.merchant_name || "P2P"}`,
-            sublabel: `UPI Ref No ${t.upi_ref_no}`,
+            sublabel: `UPI Reference ID ${t.upi_ref_no}`,
             href: `/transactions/${t.id}`,
           })),
         ...cases
@@ -68,7 +68,7 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search transaction ID, merchant, amount, or case ID"
+            placeholder="Search UPI Reference ID, merchant, amount, or case ID"
             className="flex-1 text-sm outline-none"
           />
           <button onClick={onClose} aria-label="Close search">
@@ -78,7 +78,7 @@ export default function SearchModal({ onClose }: { onClose: () => void }) {
 
         {loading && <div className="text-sm text-ink-secondary px-2">Loading your data…</div>}
         {!loading && q && results.length === 0 && <div className="text-sm text-ink-secondary px-2">No matches for &quot;{query}&quot;.</div>}
-        {!loading && !q && <div className="text-sm text-ink-secondary px-2">Try a transaction ID, merchant, amount, or case ID.</div>}
+        {!loading && !q && <div className="text-sm text-ink-secondary px-2">Try a UPI Reference ID, merchant, amount, or case ID.</div>}
 
         <ul className="max-h-72 overflow-y-auto divide-y divide-border">
           {results.map((r) => (

@@ -80,6 +80,12 @@ export interface CaseDetail {
   customer: { id: string; name: string; preferred_language: string } | null;
   transaction: Transaction | null;
   policy_result: PolicyResult | null;
+  /** Live, backend-authoritative — recomputed from (transaction, demo
+   * clock) on every read. Always prefer these over `dispute.compensation_amount`,
+   * which is only a persisted audit snapshot from the last follow-up run. */
+  current_demo_time: string;
+  days_overdue: number | null;
+  current_compensation: number | null;
   messages: CaseMessage[];
   timeline: TimelineEvent[];
   followup: { id: string; status: string; scheduled_for: string; attempt_count: number } | null;
@@ -91,10 +97,16 @@ export interface CaseListItem {
   id: string;
   customer_id: string;
   transaction_id: string | null;
+  upi_ref_no: string | null;
+  merchant_name: string | null;
+  amount: number | null;
   intent: string | null;
   status: string;
   priority: string;
   escalation_reason: string | null;
+  deadline: string | null;
+  days_overdue: number | null;
+  current_compensation: number | null;
   created_at: string;
   closed_at: string | null;
 }
@@ -149,7 +161,7 @@ export interface Refund {
 }
 
 export interface AttentionItem {
-  type: "CASE" | "BILL" | "FASTAG" | "AUTOPAY" | "REFUND";
+  type: "CASE" | "TRANSACTION" | "BILL" | "FASTAG" | "AUTOPAY" | "REFUND";
   id: string;
   title: string;
   subtitle: string | null;

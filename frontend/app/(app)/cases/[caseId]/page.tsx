@@ -2,9 +2,13 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { getCase, getCaseMemory } from "@/lib/api";
+import { useAssistant } from "@/lib/assistant-context";
 import type { CaseDetail, MemorySection } from "@/types";
+import AnimatedNumber from "@/components/AnimatedNumber";
 import AutonomousLoopStrip from "@/components/AutonomousLoopStrip";
+import CopyReferenceId from "@/components/CopyReferenceId";
 import StatusBadge from "@/components/StatusBadge";
 import Timeline from "@/components/Timeline";
 import SimulationControls from "@/components/SimulationControls";
@@ -13,6 +17,7 @@ import MemoryPanel from "@/components/MemoryPanel";
 export default function CaseTimelinePage() {
   const params = useParams<{ caseId: string }>();
   const router = useRouter();
+  const { setPageContext } = useAssistant();
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [memory, setMemory] = useState<MemorySection | null>(null);
   const [memoryLoading, setMemoryLoading] = useState(true);
@@ -33,6 +38,18 @@ export default function CaseTimelinePage() {
   }, [load]);
 
   useEffect(() => {
+    if (!detail || detail.status === "RESOLVED") {
+      setPageContext(null);
+      return;
+    }
+    setPageContext({
+      summary: `case ${detail.id}, which I'm still monitoring`,
+      suggestedMessage: "Abhi tak paise nahi aaye — what's the current status of this case?",
+    });
+    return () => setPageContext(null);
+  }, [detail, setPageContext]);
+
+  useEffect(() => {
     // Fetched separately from the case itself — this can hit Cognee Cloud
     // and take a few seconds; it must never hold up the rest of the page.
     setMemoryLoading(true);
@@ -43,27 +60,67 @@ export default function CaseTimelinePage() {
   }, [params.caseId]);
 
   if (error) {
-    return <div className="page-shell max-w-4xl text-danger">{error}</div>;
+    return (
+      <div className="page-shell max-w-4xl">
+        <div className="card p-6 text-danger text-sm">{error}</div>
+      </div>
+    );
   }
   if (!detail) {
-    return <div className="page-shell max-w-4xl text-ink-secondary">Loading case…</div>;
+    return (
+      <div className="page-shell max-w-4xl space-y-6">
+        <div className="h-8 w-40 rounded skeleton" />
+        <div className="h-56 rounded-xl skeleton" />
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+          <div className="h-72 rounded-xl skeleton" />
+          <div className="h-72 rounded-xl skeleton" />
+        </div>
+      </div>
+    );
   }
 
   const txn = detail.transaction;
+  const hasCompensation = detail.current_compensation !== null && detail.current_compensation > 0;
 
   return (
     <div className="page-shell max-w-4xl space-y-6">
-      <button onClick={() => router.back()} className="text-sm text-brand-dark">
+      <button
+        onClick={() => router.back()}
+        className="text-sm text-brand-dark hover:-translate-x-0.5 transition-transform duration-150 inline-flex items-center gap-1"
+      >
         ← Back
       </button>
 
-      <div className="card p-6">
+      <div className="card p-6 animate-fade-in-up">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-lg font-bold text-ink">Case {detail.id}</h1>
           <StatusBadge status={detail.status} />
         </div>
 
         <AutonomousLoopStrip status={detail.status} />
+
+        {hasCompensation && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mt-6 rounded-xl bg-gradient-to-br from-danger-light to-white border border-danger/15 px-5 py-4 flex items-center justify-between"
+          >
+            <div>
+              <div className="text-xs text-danger font-medium">Current applicable compensation</div>
+              <AnimatedNumber
+                value={detail.current_compensation!}
+                prefix="₹"
+                className="text-3xl font-bold text-danger tabular-nums"
+              />
+            </div>
+            {detail.days_overdue !== null && detail.days_overdue > 0 && (
+              <div className="text-right">
+                <div className="text-xs text-ink-secondary">Days overdue</div>
+                <div className="text-xl font-semibold text-ink">{detail.days_overdue}</div>
+              </div>
+            )}
+          </motion.div>
+        )}
 
         {txn && (
           <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm border-t border-border pt-4">
@@ -84,19 +141,21 @@ export default function CaseTimelinePage() {
               <div className="font-semibold text-ink">{txn.merchant_name || "—"}</div>
             </div>
             <div>
-              <div className="text-ink-secondary text-xs">UPI Ref No</div>
-              <div className="font-mono text-xs mt-1">{txn.upi_ref_no}</div>
+              <div className="text-ink-secondary text-xs">UPI Reference ID</div>
+              <div className="mt-1">
+                <CopyReferenceId value={txn.upi_ref_no} />
+              </div>
             </div>
             {detail.policy_result?.deadline && (
               <div>
-                <div className="text-ink-secondary text-xs">Deadline</div>
+                <div className="text-ink-secondary text-xs">Resolution deadline</div>
                 <div className="font-semibold text-ink">{detail.policy_result.deadline}</div>
               </div>
             )}
-            {detail.dispute && (
+            {detail.policy_result?.applicable && (
               <div>
-                <div className="text-ink-secondary text-xs">Compensation</div>
-                <div className="font-semibold text-danger">₹{detail.dispute.compensation_amount.toLocaleString("en-IN")}</div>
+                <div className="text-ink-secondary text-xs">Current demo date</div>
+                <div className="font-semibold text-ink">{detail.current_demo_time.slice(0, 10)}</div>
               </div>
             )}
             {detail.escalation_reason && (

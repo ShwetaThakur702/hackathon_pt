@@ -13,7 +13,7 @@ def _at(days_offset: int, hour: int = 9) -> datetime:
     return datetime(anchor.year, anchor.month, anchor.day, hour, 0) + timedelta(days=days_offset)
 
 
-def _prep_case(db_session, txn_id="TXN24001", customer_id="CUST001"):
+def _prep_case(db_session, txn_id="TXN24001", customer_id="CUST-001"):
     case, _ = case_service.get_or_create_case(db_session, customer_id, txn_id, "FAILED_PAYMENT")
     case_service.transition(db_session, case.id, "INVESTIGATING")
     case_service.transition(db_session, case.id, "DECIDED")
@@ -49,7 +49,19 @@ def test_recheck_still_pending_raises_dispute(db_session):
 def test_recheck_refund_received_resolves_case(db_session):
     from app.models.transaction import Transaction
 
-    case = _prep_case(db_session, txn_id="TXN30001", customer_id="CUST003")
+    # PERSON-type transaction (T+1 deadline) inserted ad hoc — distinct from
+    # the T+5 MERCHANT case above, and not part of the official 7-item demo
+    # seed, which is Priya's alone (CUST-001).
+    db_session.add(
+        Transaction(
+            id="TXN30001", upi_ref_no="601738492215", customer_id="CUST-001", amount=3000, currency="INR",
+            type="PERSON", merchant_name=None, status="FAILED", debited=True, merchant_credited=None,
+            refund_status="PENDING", transaction_date=demo_anchor_date(),
+        )
+    )
+    db_session.commit()
+
+    case = _prep_case(db_session, txn_id="TXN30001", customer_id="CUST-001")
     followup, _ = followup_service.schedule(db_session, case.id, _at(1))
 
     txn = db_session.get(Transaction, "TXN30001")
