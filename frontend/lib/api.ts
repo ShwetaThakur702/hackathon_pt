@@ -92,8 +92,9 @@ export function advanceTime(days: number, hours = 0) {
   });
 }
 
-export function advanceToDeadline() {
-  return request<{ current_time: string; followups_executed: unknown[] }>("/api/simulate/advance-to-deadline", {
+export function advanceToDeadline(caseId?: string | null) {
+  const query = caseId ? `?case_id=${encodeURIComponent(caseId)}` : "";
+  return request<{ current_time: string; followups_executed: unknown[] }>(`/api/simulate/advance-to-deadline${query}`, {
     method: "POST",
   });
 }

@@ -180,7 +180,7 @@ export default function CaseTimelinePage() {
           <Timeline events={detail.timeline} />
         </div>
         <div className="space-y-4">
-          <SimulationControls onChanged={load} />
+          <SimulationControls onChanged={load} caseId={detail.id} />
           <div className="card p-4">
             <h3 className="text-sm font-semibold text-ink mb-2">Conversation</h3>
             <div className="space-y-2 max-h-64 overflow-y-auto">

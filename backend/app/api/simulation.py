@@ -42,20 +42,29 @@ def advance_time(payload: AdvanceTimeRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/advance-to-deadline")
-def advance_to_deadline(db: Session = Depends(get_db)):
+def advance_to_deadline(case_id: str | None = None, db: Session = Depends(get_db)):
     from app.models.followup import Followup
 
-    next_followup = (
-        db.query(Followup)
-        .filter(Followup.status == "SCHEDULED")
-        .order_by(Followup.scheduled_for.asc())
-        .first()
-    )
-    if next_followup is None:
+    # Scoped to the case being viewed when given (case detail page always
+    # passes it) — without this, this endpoint picked whichever SCHEDULED
+    # followup across ALL cases in the system was earliest, so clicking
+    # "Advance to Deadline" on one case's page could jump the clock past a
+    # completely different case's deadline while leaving this one still
+    # WAITING_FOR_RESOLUTION with its own deadline unexecuted.
+    if case_id:
+        target_followup = followup_service.get_active_followup_for_case(db, case_id)
+    else:
+        target_followup = (
+            db.query(Followup)
+            .filter(Followup.status == "SCHEDULED")
+            .order_by(Followup.scheduled_for.asc())
+            .first()
+        )
+    if target_followup is None:
         return {"current_time": simulation_clock_service.now(db).isoformat(), "followups_executed": []}
 
-    new_time = simulation_clock_service.advance_to(db, next_followup.scheduled_for)
-    audit_service.write_event(db, event_type="SIM_CLOCK_ADVANCED", actor="SYSTEM", metadata={"target": "next_deadline"})
+    new_time = simulation_clock_service.advance_to(db, target_followup.scheduled_for)
+    audit_service.write_event(db, event_type="SIM_CLOCK_ADVANCED", actor="SYSTEM", metadata={"target": "next_deadline", "case_id": case_id})
     executed = _run_due_followups(db)
     return {"current_time": new_time.isoformat(), "followups_executed": executed}
 

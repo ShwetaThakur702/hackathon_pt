@@ -14,7 +14,7 @@ function Spinner() {
   );
 }
 
-export default function SimulationControls({ onChanged }: { onChanged?: () => void }) {
+export default function SimulationControls({ onChanged, caseId }: { onChanged?: () => void; caseId?: string | null }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<string | null>(null);
 
@@ -54,7 +54,7 @@ export default function SimulationControls({ onChanged }: { onChanged?: () => vo
         <button disabled={!!busy} onClick={() => run("advance1", () => advanceTime(1))} className="btn-primary btn-sm">
           {busy === "advance1" ? <Spinner /> : "+1 Day"}
         </button>
-        <button disabled={!!busy} onClick={() => run("deadline", () => advanceToDeadline())} className="btn-primary btn-sm">
+        <button disabled={!!busy} onClick={() => run("deadline", () => advanceToDeadline(caseId))} className="btn-primary btn-sm">
           {busy === "deadline" ? <Spinner /> : "Advance to Deadline"}
         </button>
         <button disabled={!!busy} onClick={() => run("advance5", () => advanceTime(5))} className="btn-secondary btn-sm">

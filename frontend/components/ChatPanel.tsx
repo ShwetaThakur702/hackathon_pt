@@ -151,7 +151,7 @@ export default function ChatPanel() {
         ) : (
           <div className="card p-5 text-sm text-ink-secondary">No active case yet.</div>
         )}
-        <SimulationControls onChanged={() => caseId && refreshCase(caseId)} />
+        <SimulationControls onChanged={() => caseId && refreshCase(caseId)} caseId={caseId} />
       </div>
     </div>
   );
