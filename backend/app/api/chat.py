@@ -29,6 +29,7 @@ def chat(payload: ChatRequest, background_tasks: BackgroundTasks, db: Session = 
                 "customer_id": payload.customer_id,
                 "case_id": payload.case_id,
                 "user_message": payload.message,
+                "preferred_language": customer.preferred_language,
             }
         )
     except Exception:

@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 from app.agent import tools
 from app.agent.state import NishchintState
-from app.integrations.llm.llm_service import contains_sensitive_credential, llm_service, normalize_language
+from app.integrations.llm.llm_service import contains_sensitive_credential, is_greeting, llm_service, normalize_language
 from app.rules.engine import get_policy_engine
 from app.services.case_service import case_service
 from app.services.memory_service import memory_service
@@ -24,6 +24,14 @@ SUSPICIOUS_KEYWORDS = ["hack", "fraud", "unauthorized", "not me", "maine nahi ki
 SECURITY_WARNING_EN = "For your security, please don't share your UPI PIN or OTP. I don't need it to investigate your transaction."
 SECURITY_WARNING_HI = "अपनी सुरक्षा के लिए कृपया अपना यूपीआई पिन या ओटीपी साझा न करें। आपका ट्रांजेक्शन जांचने के लिए मुझे इसकी आवश्यकता नहीं है।"
 SECURITY_WARNING_HINGLISH = "Aapki suraksha ke liye, kripya apna UPI PIN ya OTP share na karein. Transaction investigate karne ke liye mujhe iski zaroorat nahi hai."
+
+GREETING_RESPONSE_EN = "Hi! What's your query?"
+GREETING_RESPONSE_HI = "नमस्ते! आपकी क्या समस्या है?"
+GREETING_RESPONSE_HINGLISH = "Hi! Aapki kya query hai?"
+
+OFF_TOPIC_RESPONSE_EN = "I can only help with Paytm payments, bills, and account support. What can I help you with on that front?"
+OFF_TOPIC_RESPONSE_HI = "मैं सिर्फ Paytm पेमेंट्स, बिल्स और अकाउंट सपोर्ट में मदद कर सकता हूं। इसमें आपकी क्या मदद कर सकता हूं?"
+OFF_TOPIC_RESPONSE_HINGLISH = "Main sirf Paytm payments, bills aur account support mein madad kar sakta hoon. Isme aapki kya madad kar sakta hoon?"
 
 
 def understand_complaint(state: NishchintState) -> dict:
@@ -41,11 +49,28 @@ def understand_complaint(state: NishchintState) -> dict:
             "extracted_entities": {},
         }
 
+    # Zero-LLM, zero-DB fast path for a bare "hi"/"hello" — the common case,
+    # and it must not fall into decide_next_action's NEEDS_CLARIFICATION
+    # branch, which would nonsensically ask a greeting for a transaction ID.
+    if is_greeting(message):
+        return {
+            "intent": "GREETING",
+            "extracted_entities": {},
+            "contains_sensitive_credential": False,
+            "is_fast_reply": True,
+        }
+
     result = llm_service.understand_complaint(message, {})
+    intent = result.get("intent", "UNKNOWN")
     return {
-        "intent": result.get("intent", "UNKNOWN"),
+        "intent": intent,
         "extracted_entities": result.get("extracted_entities", {}),
         "contains_sensitive_credential": False,
+        # OFF_TOPIC still needed one LLM call to classify, but from here it
+        # skips context assembly, transaction lookup, and the second
+        # (response-generation) LLM call — spec: stay scoped to Paytm
+        # payments support, don't deep-engage outside that.
+        "is_fast_reply": intent == "OFF_TOPIC",
     }
 
 
@@ -229,7 +254,12 @@ def write_audit(state: NishchintState) -> dict:
 
 def generate_response(state: NishchintState) -> dict:
     customer_context = state.get("customer_context") or {}
-    language = normalize_language((customer_context.get("customer") or {}).get("preferred_language"))
+    # Fast-path replies (greeting/off-topic/sensitive-credential) skip
+    # retrieve_context entirely, so customer_context won't have the
+    # customer's language — fall back to what chat.py loaded up front.
+    language = normalize_language(
+        (customer_context.get("customer") or {}).get("preferred_language") or state.get("preferred_language")
+    )
     decision = state.get("decision")
     transaction = state.get("transaction")
     policy_result = state.get("policy_result") or {}
@@ -239,6 +269,12 @@ def generate_response(state: NishchintState) -> dict:
     if state.get("contains_sensitive_credential"):
         warning = {"Hindi": SECURITY_WARNING_HI, "Hinglish": SECURITY_WARNING_HINGLISH}.get(language, SECURITY_WARNING_EN)
         return {"assistant_response": warning}
+
+    if state.get("intent") == "GREETING":
+        return {"assistant_response": {"Hindi": GREETING_RESPONSE_HI, "Hinglish": GREETING_RESPONSE_HINGLISH}.get(language, GREETING_RESPONSE_EN)}
+
+    if state.get("intent") == "OFF_TOPIC":
+        return {"assistant_response": {"Hindi": OFF_TOPIC_RESPONSE_HI, "Hinglish": OFF_TOPIC_RESPONSE_HINGLISH}.get(language, OFF_TOPIC_RESPONSE_EN)}
 
     if decision == "NEEDS_CLARIFICATION":
         candidates = state.get("transaction_candidates") or []

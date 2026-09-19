@@ -27,10 +27,23 @@ TXN_ID_PATTERN = re.compile(r"\bTXN\w+\b", re.IGNORECASE)
 # Real UPI/Paytm reference numbers are 12 digits, e.g. "809489842596" — the
 # format customers actually see and type, unlike the internal "TXN..." id.
 UPI_REF_PATTERN = re.compile(r"\b\d{12}\b")
+# Deliberately anchored to the WHOLE message (^...$) — "hi, my payment
+# failed" must still go through full understanding, only a bare greeting
+# with nothing else in it qualifies for the zero-LLM fast path.
+GREETING_PATTERN = re.compile(
+    r"^\s*(hi+|hello+|hey+|yo+|namaste|namaskar|salaam|sup|"
+    r"good\s*(morning|afternoon|evening|night)|"
+    r"kaise\s*ho|how\s*are\s*you|kya\s*haal\s*hai)\s*[!.?]*\s*$",
+    re.IGNORECASE,
+)
 
 
 def contains_sensitive_credential(text: str) -> bool:
     return bool(SENSITIVE_PATTERN.search(text))
+
+
+def is_greeting(text: str) -> bool:
+    return bool(GREETING_PATTERN.match(text.strip()))
 
 
 def normalize_language(language: str | None) -> str:

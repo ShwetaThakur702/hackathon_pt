@@ -15,10 +15,16 @@ status, deadlines, or compensation — those come from other systems. If the \
 customer shares a UPI PIN, OTP, card PIN, or password, set contains_sensitive_credential to true \
 and do not repeat the secret value anywhere in your output. If the customer cites a \
 transaction reference, it is usually a 12-digit UPI Ref No (e.g. "809489842596"); \
-extract it exactly as given, verbatim — never reformat it or invent digits."""
+extract it exactly as given, verbatim — never reformat it or invent digits.
+
+Nishchint only handles Paytm payments, transactions, bills, refunds, and \
+account/service support. Classify anything unrelated to that scope (general \
+chit-chat, trivia, requests to do something outside a payments support \
+assistant's job) as OFF_TOPIC — do not guess a payments intent just because \
+the message contains a number or a common word."""
 
 UNDERSTAND_SCHEMA_HINT = """{
-  "intent": "FAILED_PAYMENT" | "FOLLOW_UP_ON_EXISTING_CASE" | "GENERAL_QUERY" | "UNKNOWN",
+  "intent": "FAILED_PAYMENT" | "FOLLOW_UP_ON_EXISTING_CASE" | "GENERAL_QUERY" | "OFF_TOPIC" | "UNKNOWN",
   "extracted_entities": {
     "transaction_id": string | null,
     "amount": number | null,

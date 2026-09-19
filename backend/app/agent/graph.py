@@ -8,7 +8,9 @@ START -> understand_complaint -> retrieve_context -> identify_transaction ->
 
 The sensitive-credential path short-circuits straight from
 understand_complaint to generate_response so a secret never reaches the rest
-of the pipeline (spec section 29).
+of the pipeline (spec section 29). A bare greeting or an off-topic message
+takes the same shortcut (is_fast_reply) — no DB context assembly, no LLM
+response call, just a canned reply in the customer's language.
 """
 
 from langgraph.graph import END, StateGraph
@@ -18,7 +20,9 @@ from app.agent.state import NishchintState
 
 
 def _route_after_understand(state: NishchintState) -> str:
-    return "generate_response" if state.get("contains_sensitive_credential") else "retrieve_context"
+    if state.get("contains_sensitive_credential") or state.get("is_fast_reply"):
+        return "generate_response"
+    return "retrieve_context"
 
 
 def _route_after_identify(state: NishchintState) -> str:

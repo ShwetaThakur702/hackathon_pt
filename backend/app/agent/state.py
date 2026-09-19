@@ -10,10 +10,15 @@ class NishchintState(TypedDict, total=False):
     case_id: str | None
 
     user_message: str
+    # Loaded once in chat.py, ahead of the graph — lets fast-path replies
+    # (greeting/off-topic) speak in the customer's chosen language without
+    # running the full retrieve_context node just to look it up.
+    preferred_language: str | None
 
     intent: str | None
     extracted_entities: dict
     contains_sensitive_credential: bool
+    is_fast_reply: bool
 
     customer_context: dict
     transaction: dict | None

@@ -23,13 +23,17 @@ class GroqProvider(LLMProvider):
         self._api_key = settings.llm_api_key
         self._model = settings.llm_model or "qwen/qwen3.8-27b"
 
-    def _chat(self, system_prompt: str, user_prompt: str, json_mode: bool = False) -> str:
+    def _chat(self, system_prompt: str, user_prompt: str, json_mode: bool = False, max_tokens: int = 300) -> str:
         payload = {
             "model": self._model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
+            # Both prompts (prompts.py) ask for a small structured object or
+            # 2-4 sentences — capping output bounds worst-case latency
+            # instead of leaving generation length unconstrained.
+            "max_tokens": max_tokens,
         }
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
@@ -38,7 +42,7 @@ class GroqProvider(LLMProvider):
             API_URL,
             headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
             json=payload,
-            timeout=30.0,
+            timeout=15.0,
         )
         resp.raise_for_status()
         data = resp.json()

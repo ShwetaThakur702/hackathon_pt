@@ -1,5 +1,6 @@
 import json
 
+from app.agent.nodes import SECURITY_WARNING_EN, SECURITY_WARNING_HI, SECURITY_WARNING_HINGLISH
 from app.integrations.llm.llm_service import contains_sensitive_credential
 from app.models.audit import AuditLog
 
@@ -20,7 +21,10 @@ def test_chat_warns_and_does_not_store_secret(client):
     resp = client.post("/chat", json={"customer_id": "CUST-001", "message": "My OTP is 998877", "case_id": None})
     assert resp.status_code == 200
     body = resp.json()
-    assert "OTP" in body["message"] or "otp" in body["message"].lower()
+    # CUST-001's preferred_language is Hindi (seed.py) — the warning must
+    # come back in the customer's actual chosen language, not hardcoded
+    # English, so check against all three known-good variants.
+    assert body["message"] in (SECURITY_WARNING_EN, SECURITY_WARNING_HI, SECURITY_WARNING_HINGLISH)
 
     from app.database.session import SessionLocal
 

@@ -43,8 +43,12 @@ logger = logging.getLogger("nishchint.cognee")
 # seconds in practice; 20s was too generous and let one slow call stall an
 # entire request. Kept short deliberately — this is a "context only, never
 # required" integration (see architecture docs), so timing out and
-# returning [] / {"stored": False} is always safe.
-REQUEST_TIMEOUT = 8.0
+# returning [] / {"stored": False} is always safe. A single customer
+# message can trigger this call twice synchronously (retrieve_context's
+# recall, then execute_action's remember on a new case) — 8s each let a
+# slow Cognee Cloud response add up to ~16s to one /chat reply, so this
+# is tightened further to keep the common case fast.
+REQUEST_TIMEOUT = 3.0
 
 
 class CogneeMemoryService:

@@ -30,6 +30,23 @@ function CheckRow({ label, done }: { label: string; done: boolean }) {
   );
 }
 
+function PendingRow({ label }: { label: string }) {
+  return (
+    <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 text-sm">
+      <motion.span
+        animate={{ opacity: [0.3, 1, 0.3] }}
+        transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+        className="inline-flex h-3.5 w-3.5 items-center justify-center"
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-brand-dark inline-block" />
+      </motion.span>
+      <span className="text-ink-secondary">{label}</span>
+    </motion.div>
+  );
+}
+
+const INVESTIGATE_STEPS = ["Identified transaction", "Verified current status", "Checked previous support history"];
+
 export default function TransactionDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -42,6 +59,7 @@ export default function TransactionDetailPage() {
   const [loading, setLoading] = useState(true);
   const [resolving, setResolving] = useState(false);
   const [resolveActions, setResolveActions] = useState<string[] | null>(null);
+  const [revealedSteps, setRevealedSteps] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -77,15 +95,21 @@ export default function TransactionDetailPage() {
   async function investigateAndResolve() {
     if (!txn) return;
     setResolving(true);
-    setResolveActions([]);
+    setResolveActions(null);
+    setRevealedSteps(0);
+    const stepTimer = setInterval(() => {
+      setRevealedSteps((n) => (n < INVESTIGATE_STEPS.length ? n + 1 : n));
+    }, 450);
     try {
       const message = `I have an issue with my ₹${txn.amount} payment${txn.merchant_name ? " to " + txn.merchant_name : ""} (UPI Reference ID ${txn.upi_ref_no}). It shows as ${txn.status.toLowerCase()}.`;
       const resp = await sendChatMessage(customerId, message, null);
+      setRevealedSteps(INVESTIGATE_STEPS.length);
       setResolveActions(resp.actions);
       await load();
     } catch {
       setError("I couldn't reach the transaction service right now. I haven't taken any financial action.");
     } finally {
+      clearInterval(stepTimer);
       setResolving(false);
     }
   }
@@ -204,18 +228,28 @@ export default function TransactionDetailPage() {
               I&apos;ve detected a payment exception: ₹{txn.amount.toLocaleString("en-IN")} was debited but the payment
               did not complete.
             </p>
-            {resolveActions === null ? (
+            {resolveActions === null && !resolving ? (
               <button onClick={investigateAndResolve} disabled={resolving} className="btn-primary btn-lg">
-                {resolving ? "Investigating…" : "Investigate & Resolve"}
+                Investigate & Resolve
               </button>
             ) : (
               <div className="space-y-2 animate-fade-in-up">
-                <CheckRow label="Identified transaction" done />
-                <CheckRow label="Verified current status" done />
-                <CheckRow label="Checked previous support history" done />
-                <CheckRow label="Checked applicable resolution policy" done={resolveActions.length > 0} />
-                <CheckRow label="Created resolution case" done={resolveActions.includes("TICKET_CREATED")} />
-                {resolveActions.includes("FOLLOWUP_SCHEDULED") && (
+                {INVESTIGATE_STEPS.map((label, i) =>
+                  revealedSteps > i ? <CheckRow key={label} label={label} done /> : <PendingRow key={label} label={label} />
+                )}
+                {revealedSteps >= INVESTIGATE_STEPS.length &&
+                  (resolveActions === null ? (
+                    <>
+                      <PendingRow label="Checking applicable resolution policy" />
+                      <PendingRow label="Creating resolution case" />
+                    </>
+                  ) : (
+                    <>
+                      <CheckRow label="Checked applicable resolution policy" done={resolveActions.length > 0} />
+                      <CheckRow label="Created resolution case" done={resolveActions.includes("TICKET_CREATED")} />
+                    </>
+                  ))}
+                {resolveActions?.includes("FOLLOWUP_SCHEDULED") && (
                   <p className="text-sm text-ink pt-2">You don&apos;t need to keep checking — I&apos;ll monitor this automatically.</p>
                 )}
               </div>
