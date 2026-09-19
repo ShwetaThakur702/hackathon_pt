@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.models.bill import Bill
 from app.services.audit_service import audit_service
 from app.services.case_service import case_service
+from app.services.followup_service import followup_service
 
 
 def _insight(bill: Bill) -> dict:
@@ -61,6 +62,7 @@ class BillService:
         # advance_to walks the full forward chain (NEW -> ... -> WAITING_FOR_RESOLUTION)
         # via BFS and is a no-op if the case is already past this point.
         case_service.advance_to(db, case.id, "WAITING_FOR_RESOLUTION", actor="AGENT")
+        followup_service.schedule_reconciliation_check(db, case.id)
         return {"case_id": case.id, "created": created, "bill": _to_dict(bill)}
 
 

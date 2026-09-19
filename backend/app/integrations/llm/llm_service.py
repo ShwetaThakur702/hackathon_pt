@@ -155,6 +155,10 @@ class LLMService:
         overrides verified facts)."""
         provider = self._get_provider()
         language = normalize_language(language)
+        # Closure confirmations state a completed fact — fixed templates, so
+        # the model can't reword "received" into a future promise.
+        if verified_facts.get("situation") in ("bill_acknowledged", "fastag_updated", "refund_received"):
+            return self._fallback_response(verified_facts, language)
         if provider is not None:
             try:
                 user_prompt = (
@@ -240,6 +244,30 @@ class LLMService:
                 "This case needs human review, so I've routed it to our support team. "
                 "They'll follow up with you shortly."
             )
+
+        if situation == "bill_acknowledged":
+            p = facts.get("provider", "your provider")
+            if language == "Hindi":
+                return f"{p} ने आपका भुगतान स्वीकार कर लिया है। केस बंद कर दिया गया है।"
+            if language == "Hinglish":
+                return f"{p} ne aapka payment acknowledge kar liya hai. Case close kar diya gaya hai."
+            return f"{p} has now acknowledged your payment. I've closed the case."
+
+        if situation == "fastag_updated":
+            b = facts.get("balance")
+            if language == "Hindi":
+                return f"आपके FASTag का बैलेंस अपडेट हो गया है (₹{b:.0f})। केस बंद कर दिया गया है।"
+            if language == "Hinglish":
+                return f"Aapke FASTag ka balance update ho gaya hai (₹{b:.0f}). Case close kar diya gaya hai."
+            return f"Your FASTag balance has updated to ₹{b:.0f}. I've closed the case."
+
+        if situation == "refund_received":
+            a, m = facts.get("amount") or 0, facts.get("merchant", "the merchant")
+            if language == "Hindi":
+                return f"{m} का ₹{a:.0f} का रिफंड आपके खाते में पहुंच गया है। केस बंद कर दिया गया है।"
+            if language == "Hinglish":
+                return f"{m} ka ₹{a:.0f} ka refund aapke account mein aa gaya hai. Case close kar diya gaya hai."
+            return f"Your ₹{a:.0f} refund from {m} has reached your account. I've closed the case."
 
         if situation == "clarification_needed":
             return facts.get("clarification_question", "Could you share more detail about the transaction?")

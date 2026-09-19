@@ -17,7 +17,10 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.integrations.llm.llm_service import llm_service
+from app.models.bill import Bill
+from app.models.fastag_account import FastagAccount
 from app.models.followup import Followup
+from app.models.refund import Refund
 from app.rules.engine import get_policy_engine
 from app.services.audit_service import audit_service
 from app.services.case_service import case_service
@@ -31,8 +34,56 @@ from app.services.transaction_service import transaction_service
 
 policy_engine = get_policy_engine()
 
+# Non-transaction cases (no refund-deadline policy applies): the follow-up
+# just rechecks whether the counterparty's system has caught up, and closes
+# the case once it has — see FollowupService._resolve_reconciliation.
+RECONCILIATION_INTENTS = {"BILL_RECONCILIATION", "FASTAG_BALANCE_MISMATCH", "REFUND_MISMATCH"}
+
 
 class FollowupService:
+    def schedule_reconciliation_check(self, db: Session, case_id: str) -> Followup:
+        now = simulation_clock_service.now(db)
+        followup, _ = self.schedule(db, case_id, now + timedelta(days=1), action="RECONCILIATION_CHECK")
+        return followup
+
+    def _resolve_reconciliation(self, db: Session, case, followup: Followup) -> dict:
+        """The provider/FASTag/merchant side has caught up by the next check —
+        mirror that in the mock state, close the case, tell the customer."""
+        cid = case.customer_id
+        if case.intent == "BILL_RECONCILIATION":
+            bill = db.query(Bill).filter(Bill.customer_id == cid, Bill.provider_ack_status == "PENDING").first()
+            if bill:
+                bill.provider_ack_status = "ACKNOWLEDGED"
+            facts = {"situation": "bill_acknowledged", "provider": bill.provider_name if bill else "your provider"}
+            action = "provider_acknowledged"
+        elif case.intent == "FASTAG_BALANCE_MISMATCH":
+            acct = db.query(FastagAccount).filter(FastagAccount.customer_id == cid).first()
+            if acct and acct.last_recharge_status == "BALANCE_UPDATE_PENDING":
+                acct.balance += acct.last_recharge_amount
+                acct.last_recharge_status = "CREDITED"
+            facts = {"situation": "fastag_updated", "balance": acct.balance if acct else None}
+            action = "balance_updated"
+        else:
+            refund = db.query(Refund).filter(Refund.customer_id == cid, Refund.customer_received.is_(False)).first()
+            if refund:
+                refund.customer_received = True
+            facts = {"situation": "refund_received", "amount": refund.amount if refund else None,
+                     "merchant": refund.merchant_name if refund else "the merchant"}
+            action = "refund_received"
+        db.commit()
+
+        case_service.transition(db, case.id, "RECHECKING", actor="N8N")
+        case_service.transition(db, case.id, "RESOLVED", actor="AGENT", metadata={"reason": action})
+        message = llm_service.generate_response(facts, language=_get_customer_language(db, cid))
+        notification_service.notify_customer(db, cid, case.id, message)
+        followup.status = "COMPLETED"
+        db.commit()
+        return {
+            "result": "RESOLVED", "case_id": case.id, "customer_id": cid,
+            "status": "RESOLVED", "outcome": "RESOLVED", "action_taken": action,
+            "current_compensation": None, "next_check_at": None, "notification_message": message,
+        }
+
     def get_active_followup_for_case(self, db: Session, case_id: str) -> Followup | None:
         return (
             db.query(Followup)
@@ -157,6 +208,9 @@ class FollowupService:
         )
 
         try:
+            if case.intent in RECONCILIATION_INTENTS:
+                return self._resolve_reconciliation(db, case, followup)
+
             if case.status in ("WAITING_FOR_RESOLUTION", "DISPUTE_RAISED"):
                 case_service.transition(db, case.id, "RECHECKING", actor="N8N")
 

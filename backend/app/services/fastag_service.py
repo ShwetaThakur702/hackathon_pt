@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.fastag_account import FastagAccount
 from app.services.audit_service import audit_service
 from app.services.case_service import case_service
+from app.services.followup_service import followup_service
 
 
 def _insight(account: FastagAccount) -> dict:
@@ -46,6 +47,7 @@ class FastagService:
             metadata={"account_id": account.id, "insight": _insight(account)},
         )
         case_service.advance_to(db, case.id, "WAITING_FOR_RESOLUTION", actor="AGENT")
+        followup_service.schedule_reconciliation_check(db, case.id)
         return {"case_id": case.id, "created": created, "account": _to_dict(account)}
 
 

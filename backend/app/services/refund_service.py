@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.refund import Refund
 from app.services.audit_service import audit_service
 from app.services.case_service import case_service
+from app.services.followup_service import followup_service
 
 
 def _insight(refund: Refund) -> dict:
@@ -53,6 +54,7 @@ class RefundService:
             metadata={"refund_id": refund.id, "merchant_name": refund.merchant_name, "insight": _insight(refund)},
         )
         case_service.advance_to(db, case.id, "WAITING_FOR_RESOLUTION", actor="AGENT")
+        followup_service.schedule_reconciliation_check(db, case.id)
         return {"case_id": case.id, "created": created, "refund": _to_dict(refund)}
 
 
