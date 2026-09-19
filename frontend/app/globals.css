@@ -24,6 +24,14 @@ body {
   @apply bg-white rounded-xl border border-border shadow-card transition-shadow duration-200;
 }
 
+/* The brand's "deep blue box" treatment — a 3:2 gradient of deep blue
+ * (#002970) to light/cyan blue (#00B9F1): solid deep blue through the
+ * first 3/5 of the box, blending into light blue over the remaining 2/5.
+ * Used on the hero card, quick-action tiles and similar highlighted CTAs. */
+.gradient-brand {
+  background: linear-gradient(135deg, #002970 0%, #002970 60%, #00b9f1 100%);
+}
+
 /* Opt-in: clickable cards get a gentle lift on hover, not every card. */
 .card-hover {
   @apply hover:shadow-[0_4px_16px_-4px_rgb(0,41,112,0.14)] hover:border-brand-light transition-all duration-200;
@@ -89,6 +97,40 @@ body {
   @apply btn bg-transparent text-ink-secondary hover:bg-surface hover:text-ink;
 }
 
+/* Nishchint's own signature CTA — the "Review with Nishchint" /
+ * "Investigate & Resolve" action inside the assistant widget. Gradient
+ * fill, a soft ambient glow so it reads as "this is the thing to click",
+ * and a light sweeping across on hover. Reused wherever the widget itself
+ * asks for action, so it's visually distinct from ordinary page buttons. */
+.btn-nishchint {
+  @apply btn gradient-brand text-white shadow-[0_4px_14px_-2px_rgba(0,41,112,0.4)]
+    hover:shadow-[0_8px_24px_-4px_rgba(0,185,241,0.5)] hover:-translate-y-0.5
+    relative overflow-hidden isolate;
+  animation: nishchint-glow 2.6s ease-in-out infinite;
+}
+.btn-nishchint::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.45) 48%, transparent 66%);
+  transform: translateX(-120%);
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-nishchint:hover::after {
+  transform: translateX(120%);
+}
+.btn-nishchint .btn-nishchint-arrow {
+  @apply transition-transform duration-300 ease-out;
+}
+.btn-nishchint:hover .btn-nishchint-arrow {
+  transform: translateX(4px);
+}
+
+@keyframes nishchint-glow {
+  0%, 100% { box-shadow: 0 4px 14px -2px rgba(0, 41, 112, 0.4); }
+  50% { box-shadow: 0 4px 20px 0px rgba(0, 185, 241, 0.45); }
+}
+
 /* ---------------------------------------------------------------------
  * Animations
  * ------------------------------------------------------------------- */
@@ -140,7 +182,7 @@ body {
 .stagger-list .stagger-item:nth-child(n+7) { animation-delay: 0.26s; }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-page-in, .animate-fade-in-up, .animate-pop-in, .skeleton, .stagger-list .stagger-item {
+  .animate-page-in, .animate-fade-in-up, .animate-pop-in, .skeleton, .stagger-list .stagger-item, .btn-nishchint {
     animation: none !important;
   }
 }

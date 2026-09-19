@@ -8,6 +8,7 @@ import type { CaseDetail, ContextUsed } from "@/types";
 import CaseStatusCard from "./CaseStatusCard";
 import MicButton from "./MicButton";
 import SimulationControls from "./SimulationControls";
+import Wordmark from "./shell/Wordmark";
 
 interface LocalMessage {
   sender: "CUSTOMER" | "ASSISTANT";
@@ -76,7 +77,7 @@ export default function ChatPanel() {
       <div className="card flex flex-col h-[70vh]">
         <div className="flex items-center justify-between border-b border-border p-4">
           <div>
-            <div className="font-semibold text-ink">Nishchint</div>
+            <div className="font-semibold"><Wordmark /></div>
             <div className="text-xs text-ink-secondary">Your autonomous resolution assistant</div>
           </div>
           <span className="badge bg-surface text-ink-secondary">{customer.name}</span>

@@ -10,7 +10,7 @@ export interface NavItem {
 }
 
 export const PRIMARY_NAV: NavItem[] = [
-  { href: "/", label: "Home", icon: HomeIcon },
+  { href: "/nishchint", label: "Home", icon: HomeIcon },
   { href: "/payments", label: "Payments", icon: PaymentsIcon },
   { href: "/bills", label: "Recharge & Bills", shortLabel: "Bills", icon: BillsIcon },
   { href: "/cases", label: "Cases", icon: CasesIcon },

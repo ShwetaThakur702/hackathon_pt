@@ -119,7 +119,7 @@ export default function OperationsPage() {
           <h1 className="text-xl font-bold text-ink">Operations</h1>
           <p className="text-sm text-ink-secondary">Human oversight for Nishchint&apos;s autonomous cases.</p>
         </div>
-        <Link href="/" className="text-sm text-brand-dark hover:underline">
+        <Link href="/nishchint" className="text-sm text-brand-dark hover:underline">
           ← Customer view
         </Link>
       </div>

@@ -327,8 +327,9 @@ export default function SendMoneyPage() {
                         I&apos;ve already checked the transaction.
                       </p>
                       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-                        <Link href={`/transactions/${result.id}`} className="btn-primary btn-md" onClick={() => setOpen(false)}>
-                          Investigate &amp; Resolve
+                        <Link href={`/transactions/${result.id}`} className="btn-nishchint btn-md" onClick={() => setOpen(false)}>
+                          <span>Investigate &amp; Resolve</span>
+                          <span className="btn-nishchint-arrow">→</span>
                         </Link>
                       </motion.div>
                     </div>
@@ -336,7 +337,7 @@ export default function SendMoneyPage() {
                 )}
               </AnimatePresence>
             ) : (
-              <Link href="/" className="btn-outline btn-md w-full">
+              <Link href="/nishchint" className="btn-outline btn-md w-full">
                 Back to Home
               </Link>
             )}

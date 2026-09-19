@@ -10,13 +10,14 @@ import AnimatedNumber from "@/components/AnimatedNumber";
 import AttentionCard from "@/components/home/AttentionCard";
 import QuickServices from "@/components/home/QuickServices";
 import TransactionRow from "@/components/TransactionRow";
+import WaveEntranceOverlay from "@/components/transition/WaveEntranceOverlay";
 import { BillsIcon, FastagIcon, PaymentsIcon } from "@/components/shell/icons";
 
 function greeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
+  if (hour < 12) return "Good Morning";
+  if (hour < 17) return "Good Afternoon";
+  return "Good Evening";
 }
 
 export default function HomePage() {
@@ -63,7 +64,8 @@ export default function HomePage() {
 
   return (
     <div className="page-shell space-y-6">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-dark to-brand-navy text-white p-6 animate-fade-in-up">
+      <WaveEntranceOverlay />
+      <div className="relative overflow-hidden rounded-2xl gradient-brand text-white p-6 animate-fade-in-up">
         <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" aria-hidden />
         <div className="absolute -right-4 bottom-0 h-24 w-24 rounded-full bg-brand/20" aria-hidden />
         <div className="relative">
@@ -72,27 +74,27 @@ export default function HomePage() {
           </h1>
           <p className="text-sm text-white/70 mt-1">Here&apos;s what&apos;s happening with your money.</p>
 
-          <div className="flex flex-wrap gap-6 mt-6 pt-5 border-t border-white/15">
-            <div>
+          <div className="flex flex-wrap gap-8 mt-6 pt-5 border-t border-white/15">
+            <div className="text-center">
               <div className="text-xs text-white/60">Transactions</div>
               {loading ? (
-                <div className="h-6 w-10 rounded skeleton bg-white/10 mt-1" />
+                <div className="h-6 w-10 mx-auto rounded skeleton bg-white/10 mt-1" />
               ) : (
                 <AnimatedNumber value={transactions.length} className="text-xl font-semibold tabular-nums" />
               )}
             </div>
-            <div>
+            <div className="text-center">
               <div className="text-xs text-white/60">Total activity</div>
               {loading ? (
-                <div className="h-6 w-16 rounded skeleton bg-white/10 mt-1" />
+                <div className="h-6 w-16 mx-auto rounded skeleton bg-white/10 mt-1" />
               ) : (
                 <AnimatedNumber value={totalSpent} prefix="₹" className="text-xl font-semibold tabular-nums" />
               )}
             </div>
-            <div>
+            <div className="text-center">
               <div className="text-xs text-white/60">Nishchint is watching</div>
               {loading ? (
-                <div className="h-6 w-10 rounded skeleton bg-white/10 mt-1" />
+                <div className="h-6 w-10 mx-auto rounded skeleton bg-white/10 mt-1" />
               ) : (
                 <AnimatedNumber value={items.length} className="text-xl font-semibold tabular-nums" />
               )}
@@ -114,8 +116,8 @@ export default function HomePage() {
             <Link
               key={a.label}
               href={a.href}
-              className="stagger-item tap-target group flex flex-col items-center justify-center gap-2 rounded-xl bg-brand-dark text-white text-sm font-medium py-4 text-center
-                transition-all duration-200 hover:bg-brand-navy hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
+              className="stagger-item tap-target group flex flex-col items-center justify-center gap-2 rounded-xl gradient-brand text-white text-sm font-medium py-4 text-center
+                transition-all duration-200 hover:brightness-110 hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
             >
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 transition-transform duration-200 group-hover:scale-110">
                 <Icon className="w-5 h-5" />

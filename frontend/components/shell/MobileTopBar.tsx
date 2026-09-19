@@ -4,23 +4,38 @@ import Link from "next/link";
 import { useState } from "react";
 import { useCustomer } from "@/lib/customer-context";
 import LanguageSelector from "@/components/home/LanguageSelector";
-import { BellIcon, SearchIcon, SparkleIcon, UserIcon } from "./icons";
+import WaveExitOverlay from "@/components/transition/WaveExitOverlay";
+import { useWaveNavigate } from "@/components/transition/useWaveNavigate";
+import Wordmark from "./Wordmark";
+import { BellIcon, HomeIcon, SearchIcon, SparkleIcon, UserIcon } from "./icons";
 import SearchModal from "./SearchModal";
 
 export default function MobileTopBar() {
   const { customer } = useCustomer();
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const { active: waveActive, navigate: waveNavigate, handleCovered } = useWaveNavigate();
 
   return (
     <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-border">
+      <WaveExitOverlay active={waveActive} onCovered={handleCovered} />
       <div className="flex items-center justify-between h-14 px-4">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-dark text-white font-bold text-xs">
-            N
-          </span>
-          <span className="font-bold text-brand-dark">Nishchint</span>
-        </Link>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => waveNavigate("/", "Welcome back to Paytm", "Recharges, bills and payments — all in one place.")}
+            className="tap-target flex items-center justify-center"
+            aria-label="Back to Paytm"
+            title="Back to Paytm"
+          >
+            <HomeIcon className="w-5 h-5 text-ink-secondary" />
+          </button>
+          <Link href="/nishchint" className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-dark text-white font-bold text-xs">
+              N
+            </span>
+            <Wordmark className="font-bold" />
+          </Link>
+        </div>
         <div className="flex items-center gap-1">
           <button onClick={() => setSearchOpen(true)} className="tap-target flex items-center justify-center" aria-label="Search">
             <SearchIcon className="w-5 h-5 text-ink-secondary" />

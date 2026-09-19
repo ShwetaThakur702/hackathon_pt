@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Wordmark from "./Wordmark";
 import { PRIMARY_NAV, MORE_NAV } from "./nav-items";
 
 export default function Footer() {
@@ -9,11 +10,11 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-6 py-10">
         <div className="grid grid-cols-4 gap-8">
           <div className="col-span-2">
-            <Link href="/" className="flex items-center gap-2">
+            <Link href="/nishchint" className="flex items-center gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-dark text-white font-bold text-sm">
                 N
               </span>
-              <span className="font-bold text-lg text-brand-dark tracking-tight">Nishchint</span>
+              <Wordmark className="font-bold text-lg tracking-tight" />
             </Link>
             <p className="text-sm text-ink-secondary mt-3 max-w-xs">
               Your autonomous payment &amp; service resolution assistant — Nishchint notices, investigates, acts and
@@ -47,6 +48,11 @@ export default function Footer() {
               <li>
                 <Link href="/operations" className="text-sm text-ink hover:text-brand-dark transition-colors duration-150">
                   Operations Console
+                </Link>
+              </li>
+              <li>
+                <Link href="/" className="text-sm text-ink hover:text-brand-dark transition-colors duration-150">
+                  ← Back to Paytm
                 </Link>
               </li>
             </ul>

@@ -6,8 +6,11 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCustomer } from "@/lib/customer-context";
 import LanguageSelector from "@/components/home/LanguageSelector";
+import WaveExitOverlay from "@/components/transition/WaveExitOverlay";
+import { useWaveNavigate } from "@/components/transition/useWaveNavigate";
+import Wordmark from "./Wordmark";
 import { MORE_NAV, PRIMARY_NAV } from "./nav-items";
-import { BellIcon, MoreIcon, SearchIcon, SparkleIcon, UserIcon } from "./icons";
+import { BellIcon, HomeIcon, MoreIcon, SearchIcon, SparkleIcon, UserIcon } from "./icons";
 import SearchModal from "./SearchModal";
 
 const dropdownMotion = {
@@ -23,18 +26,29 @@ export default function TopNav() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const { active: waveActive, navigate: waveNavigate, handleCovered } = useWaveNavigate();
 
   const moreActive = MORE_NAV.some((item) => item.href === pathname);
 
   return (
     <header className="hidden lg:block sticky top-0 z-30 bg-white/90 backdrop-blur-sm border-b border-border">
+      <WaveExitOverlay active={waveActive} onCovered={handleCovered} />
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center h-16 gap-6">
-          <Link href="/" className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => waveNavigate("/", "Welcome back to Paytm", "Recharges, bills and payments — all in one place.")}
+            className="btn-outline btn-sm text-ink-secondary shrink-0"
+            title="Back to Paytm"
+          >
+            <HomeIcon className="w-4 h-4" />
+            <span>Paytm</span>
+          </button>
+
+          <Link href="/nishchint" className="flex items-center gap-2 shrink-0">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-dark text-white font-bold text-sm">
               N
             </span>
-            <span className="font-bold text-lg text-brand-dark tracking-tight">Nishchint</span>
+            <Wordmark className="font-bold text-lg tracking-tight" />
           </Link>
 
           <nav className="flex items-center gap-1">
